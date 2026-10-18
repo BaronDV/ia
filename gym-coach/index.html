@@ -371,7 +371,7 @@ const EX = {
     setup: ["Set a cable handle at chest height.", "Stand side-on to the machine, feet shoulder-width, holding the handle at your chest with both hands.", "Step away until you feel tension."],
     how: ["Press the handle straight out in front of your chest.", "Resist the cable pulling you round. Your body stays square.", "Bring it back to your chest. Do all your reps, then face the other way."],
     avoid: ["Letting your body twist toward the machine.", "Standing so close there's no tension."],
-    alts: ["dead_bug", "plank"] },
+    alts: ["ab_crunch_machine", "cable_crunch"] },
   goblet_squat: { name: "Goblet squat (dumbbell)", area: "Legs", unit: "kg", inc: 2,
     setup: ["Hold one dumbbell upright against your chest, both hands cupping the top end.", "Feet a little wider than shoulder-width, toes turned out slightly."],
     how: ["Sit down between your heels, keeping your chest up.", "Go as low as you can while your heels stay down and your back stays flat.", "Stand up by pushing through your whole foot."],
@@ -407,6 +407,46 @@ const EX = {
     how: ["Lower your chest to the bench.", "Push back up.", "Over the weeks, use a lower surface to make it harder."],
     avoid: ["Hips sagging.", "Elbows flared straight out."],
     alts: ["chest_press", "db_bench"] },
+  cable_curl: { name: "Cable biceps curl", area: "Arms", unit: "kg", inc: 2.5,
+    setup: ["Attach a straight or EZ bar to the low cable.", "Stand facing the machine, feet hip-width, holding the bar palms up with your arms straight."],
+    how: ["Keep your elbows pinned to your sides.", "Curl the bar up toward your shoulders.", "Squeeze for a second, then lower slowly until your arms are straight."],
+    avoid: ["Swinging your body or leaning back to lift the weight.", "Letting your elbows drift forward.", "Dropping the weight on the way down."],
+    alts: ["machine_curl", "db_curl"] },
+  machine_curl: { name: "Biceps curl machine", area: "Arms", unit: "kg", inc: 2.5,
+    setup: ["Set the seat so your upper arms rest flat on the pad and your elbows line up with the pivot point.", "Grab the handles palms up."],
+    how: ["Curl the handles up toward your shoulders.", "Squeeze, then lower slowly until your arms are almost straight."],
+    avoid: ["Lifting your elbows off the pad.", "A seat height that leaves your elbows out of line with the pivot."],
+    alts: ["cable_curl", "db_curl"] },
+  db_curl: { name: "Dumbbell biceps curl", area: "Arms", unit: "kg", inc: 1, perHand: true,
+    setup: ["Stand or sit holding a dumbbell in each hand, palms forward, arms straight."],
+    how: ["Curl both dumbbells up with your elbows at your sides.", "Lower slowly until your arms are straight."],
+    avoid: ["Swinging the weights up with your back.", "Half reps that skip the bottom."],
+    alts: ["cable_curl", "machine_curl"] },
+  triceps_pushdown: { name: "Cable triceps pushdown", area: "Arms", unit: "kg", inc: 2.5,
+    setup: ["Attach a rope or short bar to the high cable.", "Stand facing the machine and bring your elbows to your sides, forearms about level with the floor."],
+    how: ["Push down until your arms are straight.", "Squeeze the backs of your arms for a second.", "Let the handle rise slowly until your forearms are level again. Your elbows stay put."],
+    avoid: ["Elbows flaring out or drifting forward.", "Leaning over the handle to push with your body weight."],
+    alts: ["triceps_machine"] },
+  triceps_machine: { name: "Triceps press machine (seated dip)", area: "Arms", unit: "kg", inc: 2.5,
+    setup: ["Set the seat so the handles are at about your lower ribs.", "Sit tall with your back against the pad."],
+    how: ["Press the handles down until your arms are straight.", "Return slowly until your elbows bend to about 90°."],
+    avoid: ["Shrugging your shoulders up.", "Letting the weight pull your shoulders forward at the top."],
+    alts: ["triceps_pushdown"] },
+  ab_crunch_machine: { name: "Ab crunch machine", area: "Core", unit: "kg", inc: 2.5,
+    setup: ["Set the seat so the chest pads or handles sit at your upper chest.", "Hook your feet under the foot pads if there are any."],
+    how: ["Breathe out and curl your ribs down toward your hips, rounding your upper back.", "Pause for a second with your abs squeezed.", "Return slowly until you feel a stretch in your stomach."],
+    avoid: ["Pulling with your arms instead of curling with your abs.", "Going so heavy your hips do the work.", "Rushing the way back."],
+    alts: ["cable_crunch", "pallof_press"] },
+  cable_crunch: { name: "Kneeling cable crunch", area: "Core", unit: "kg", inc: 2.5,
+    setup: ["Attach a rope to the high cable.", "Kneel facing the machine, holding the rope ends beside your head."],
+    how: ["Curl your ribs down toward your hips, rounding your back.", "Keep your hips still.", "Return slowly until your back is straight."],
+    avoid: ["Sitting back on your heels to move the weight with your hips.", "Pulling with your arms."],
+    alts: ["ab_crunch_machine", "pallof_press"] },
+  knee_raise: { name: "Captain's chair knee raise", area: "Core", unit: "reps", rng: [8, 15],
+    setup: ["Step into the station with your forearms on the pads and your back against the backrest.", "Grip the handles and let your legs hang."],
+    how: ["Bring your knees up toward your chest, curling your hips up slightly.", "Lower slowly without swinging."],
+    avoid: ["Swinging your legs for momentum.", "Arching your back off the pad."],
+    alts: ["ab_crunch_machine", "cable_crunch"] },
   treadmill: { name: "Treadmill (incline walk)", area: "Cardio", unit: "min", cardio: true,
     setup: ["Clip the safety key to your clothes.", "Start at 0% incline and an easy walking pace."],
     how: ["Raise the incline to 6–10% and walk at about 4.5–5.5 km/h.", "Stand tall and let your arms swing.", "Aim to be breathing harder but still able to talk."],
@@ -418,16 +458,16 @@ const EX = {
     avoid: ["Seat too low, which strains your knees.", "Resistance so low your legs spin with no effort."],
     alts: ["treadmill"] },
 };
-const AREAS = ["Legs", "Chest", "Back", "Shoulders", "Core", "Cardio"];
+const AREAS = ["Legs", "Chest", "Back", "Shoulders", "Arms", "Core", "Cardio"];
 
 const PROGRAM = {
   1: {
-    A: [["leg_press", 3, 10, 12], ["chest_press", 3, 10, 12], ["seated_row", 3, 10, 12], ["leg_curl", 2, 10, 15], ["plank", 2, 20, 40]],
-    B: [["lat_pulldown", 3, 10, 12], ["leg_press", 3, 10, 12], ["shoulder_press", 3, 10, 12], ["leg_curl", 2, 10, 15], ["dead_bug", 2, 8, 12]],
+    A: [["leg_press", 3, 10, 12], ["chest_press", 3, 10, 12], ["seated_row", 3, 10, 12], ["leg_curl", 2, 10, 15], ["cable_curl", 2, 10, 15], ["triceps_pushdown", 2, 10, 15], ["ab_crunch_machine", 2, 10, 15]],
+    B: [["lat_pulldown", 3, 10, 12], ["leg_press", 3, 10, 12], ["shoulder_press", 3, 10, 12], ["leg_curl", 2, 10, 15], ["cable_curl", 2, 10, 15], ["triceps_pushdown", 2, 10, 15], ["pallof_press", 2, 10, 12]],
   },
   2: {
-    A: [["leg_press", 3, 8, 12], ["db_bench", 3, 8, 12], ["seated_row", 3, 10, 12], ["db_rdl", 3, 8, 12], ["plank", 2, 30, 45]],
-    B: [["goblet_squat", 3, 8, 12], ["lat_pulldown", 3, 10, 12], ["db_shoulder_press", 3, 8, 12], ["leg_curl", 2, 10, 15], ["pallof_press", 2, 10, 12]],
+    A: [["leg_press", 3, 8, 12], ["db_bench", 3, 8, 12], ["seated_row", 3, 10, 12], ["db_rdl", 3, 8, 12], ["cable_curl", 2, 10, 15], ["triceps_pushdown", 2, 10, 15], ["ab_crunch_machine", 2, 10, 15]],
+    B: [["goblet_squat", 3, 8, 12], ["lat_pulldown", 3, 10, 12], ["db_shoulder_press", 3, 8, 12], ["leg_curl", 2, 10, 15], ["cable_curl", 2, 10, 15], ["triceps_pushdown", 2, 10, 15], ["knee_raise", 2, 8, 15]],
   },
 };
 const SLOTS = new Set(Object.values(PROGRAM).flatMap(p => Object.values(p).flatMap(s => s.map(x => x[0]))));
@@ -542,7 +582,7 @@ function programFor(ph, session) {
   return PROGRAM[Math.min(ph, 2)][session].map(([slot, sets, lo, hi]) => {
     const ex = exFor(slot); const e = EX[ex];
     if (e.unit !== EX[slot].unit && e.rng) [lo, hi] = e.rng;
-    let n = ph >= 3 ? Math.max(sets, 3) : sets;
+    let n = ph >= 3 && EX[slot].area !== "Core" ? Math.max(sets, 3) : sets;
     if (deloadOn()) n = Math.max(1, n - 1);
     return { slot, ex, sets: n, lo, hi };
   });
@@ -673,7 +713,7 @@ function previewHTML(doneToday) {
   const other = s === "A" ? "B" : "A";
   return `<div class="card">
     ${doneToday ? `<p class="muted">Nice work today. Rest tomorrow and get your steps in. Here's your next session.</p>` : ""}
-    <div class="between"><h2>Session ${s}</h2><span class="muted small">about 50 min</span></div>
+    <div class="between"><h2>Session ${s}</h2><span class="muted small">about 55 min</span></div>
     ${deloadOn() ? `<p class="pill warn">Easy week until ${fmtDate(P().deloadUntil)}: fewer sets, lighter weights</p>` : ""}
     <ul class="plan">
       <li><span>Warm-up</span><span class="muted small">5 min</span><span class="sub">${WARMUP}</span></li>
@@ -948,9 +988,9 @@ function checkinHTML() {
 
 /* Plan */
 const PHASE_INFO = {
-  1: ["Weeks 1–4", "Learn the machines", "Machines guide the movement, so you can learn each pattern safely and find your starting weights. 2–3 sets per exercise."],
+  1: ["Weeks 1–4", "Learn the machines", "Machines and cables only, so you can learn each movement safely and find your starting weights. 2–3 sets per exercise."],
   2: ["Weeks 5–8", "Add dumbbells", "Goblet squat, dumbbell bench press, Romanian deadlift and dumbbell shoulder press join in. Most exercises go to 3 sets."],
-  3: ["Week 9 on", "Build", "Same exercises as phase 2 with 3 sets on everything. Keep adding weight whenever you reach the top of the rep range."],
+  3: ["Week 9 on", "Build", "Same exercises as phase 2, with a third set on leg curls and arms. Keep adding weight whenever you reach the top of the rep range."],
 };
 const domId = k => k.replace(/[^a-z0-9]/gi, "-");
 function guideBody(id, scope) {
@@ -976,7 +1016,7 @@ function planSessionHTML(ph, s) {
     const sub = `${it.sets} × ${rangeStr(e, it.lo, it.hi)} · ${e.area}${it.ex !== it.slot ? ` · replaces ${esc(EX[it.slot].name)}` : ""}`;
     return guideRow(`p${ph}${s}${k}-${it.ex}`, it.ex, `${k + 1}. ${esc(e.name)}`, sub, right);
   }).join("");
-  return `<div class="card"><div class="between"><h2>Session ${s}</h2><span class="muted small">about 50 min</span></div>
+  return `<div class="card"><div class="between"><h2>Session ${s}</h2><span class="muted small">about 55 min</span></div>
     <div>${guideRow(`p${ph}${s}w-bike`, "bike", "Warm-up", WARMUP)}${rows}${guideRow(`p${ph}${s}f-treadmill`, "treadmill", "Finisher: incline walk", FINISHER)}</div></div>`;
 }
 function rhythmHTML() {
@@ -1036,7 +1076,7 @@ function coachRules() {
   return `You are the coach inside First Rep Coach, a gym app for a complete beginner who trains 3 days a week at an Anytime Fitness club with a fat-loss goal.
 Be warm, direct and practical. Keep answers under 150 words unless asked for more. Plain text only: short paragraphs or a few "- " bullets, no headings, no tables, no markdown bold.
 Use the user's real data below and give concrete numbers (kg, reps, grams, steps, minutes).
-Training approach: full-body sessions A and B alternating, machines first (phase 1), dumbbells from week 5. Double progression: add weight once every set reaches the top of the rep range. Sets end with about 2 good reps left (no training to failure). Rest 90 s between sets, 60 s for core.
+Training approach: full-body sessions A and B alternating, machines first (phase 1), dumbbells from week 5. Double progression: add weight once every set reaches the top of the rep range. Sets end with about 2 good reps left (no training to failure). Rest 90 s between sets, 60 s for arms and core. The user prefers machines and cables over floor exercises.
 Nutrition approach: a moderate deficit, the protein target, simple habits. Never suggest under 1,800 kcal for a man or 1,400 for a woman, crash diets, fat burners or skipping meals.
 Safety: you are not a doctor. For sharp pain, joint pain that lingers, chest pain, dizziness or numbness, tell them to stop that exercise and see a doctor or physiotherapist, and offer a pain-free alternative.
 ${sampleTools ? "You can change the plan with your tools. Only do that when the user asks for a change or agrees to one you suggested, then say exactly what you changed." : "You cannot change the plan yourself. Tell the user which button to use: Swap on an exercise, or Settings for targets."}`;
@@ -1198,7 +1238,7 @@ function beep() {
 }
 const T = { on: false, start: 0, target: 90, beeped: false, hold: null, restored: false };
 const mmss = sec => `${Math.floor(sec / 60)}:${pad(sec % 60)}`;
-function restFor(ex) { const e = EX[ex]; return e && e.area === "Core" ? 60 : (P() && P().rest) || 90; }
+function restFor(ex) { const e = EX[ex]; return e && (e.area === "Core" || e.area === "Arms") ? 60 : (P() && P().rest) || 90; }
 function startRest(sec, from = Date.now()) {
   T.on = true; T.start = from; T.target = sec; T.beeped = Date.now() - from >= sec * 1000;
   $("#timer").hidden = false; tick();
@@ -1245,11 +1285,12 @@ async function keepAwake(on) {
 }
 
 const WHY = [
-  ["3 full-body days", "Every session trains legs, a push and a pull, so each major muscle works 1–2 times a week. When weekly sets are equal, how you spread them over the week makes little difference to muscle growth. Full-body days mean a missed session doesn't skip a muscle for a week."],
+  ["3 full-body days", "Every session trains legs, a push, a pull, arms and core, so each muscle works 1–2 times a week. When weekly sets are equal, how you spread them over the week makes little difference to muscle growth. Full-body days mean a missed session doesn't skip a muscle for a week."],
   ["How many sets", "About 6–10 hard sets per muscle per week to start, rising in phases 2 and 3. Beginners make real gains on little volume. More sets keep helping with diminishing returns, so volume grows once the moves feel familiar."],
   ["Reps and effort", "8–15 reps, ending each set with about 2 good reps left. Light and heavy weights build similar muscle when the sets are hard, and going all the way to failure isn't needed."],
   ["Adding weight", "Hit the top of the rep range on every set and the weight goes up next time. Far too light (3+ reps over)? It jumps twice as far."],
-  ["Rest", "90 seconds, 60 for core. Resting over 60 s builds a little more muscle than shorter rests; past about 90 s studies find little extra. Still out of breath? Take longer. The timer keeps counting."],
+  ["Arms", "Presses and rows already work your biceps and triceps. Adding curls and pushdowns gives a small extra boost to arm size, especially the triceps, for about 6 minutes a session."],
+  ["Rest", "90 seconds, 60 for arms and core. Resting over 60 s builds a little more muscle than shorter rests; past about 90 s studies find little extra. Still out of breath? Take longer. The timer keeps counting."],
   ["Machines first", "Machines and free weights build similar muscle. Strength carries over best to what you practise, so dumbbells join in week 5 once you have the basics."],
   ["Walking after lifting", "Adding cardio barely dents muscle and strength gains. Easy incline walking after weights burns extra calories without hurting recovery."],
   ["Lifting while losing fat", "Lifting during a calorie deficit protects muscle, so more of the weight you lose comes from fat."],
@@ -1260,6 +1301,7 @@ const WHY_SOURCES = [
   ["https://pubmed.ncbi.nlm.nih.gov/41343037/", "Weekly volume and frequency dose-response (Pelland et al., 2025)"],
   ["https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10933173/", "Minimal effective training for beginners (2024 review)"],
   ["https://pubmed.ncbi.nlm.nih.gov/28834797/", "Low vs high load training (Schoenfeld et al., 2017)"],
+  ["https://pmc.ncbi.nlm.nih.gov/articles/PMC6317138", "Adding arm isolation work to compound training"],
   ["https://rke.abertay.ac.uk/en/publications/exploring-the-dose-response-relationship-between-estimated-resist/", "Proximity to failure (Robinson et al., 2024)"],
   ["https://www.frontiersin.org/journals/sports-and-active-living/articles/10.3389/fspor.2024.1429789/text", "Rest between sets (Singer et al., 2024)"],
   ["https://doaj.org/article/a7282dba5e674176bde2a8239832d2f7", "Free weights vs machines (Haugen et al., 2023)"],
