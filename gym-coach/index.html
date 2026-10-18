@@ -211,6 +211,12 @@ details.guide[open] summary .chev { transform: rotate(-135deg); }
 .rhythm .h { text-align: center; }
 .rh { aspect-ratio: 1; max-width: 100%; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); display: grid; place-items: center; font-family: var(--f-display); font-weight: 700; font-size: 16px; }
 .rh.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; max-height: 55vh; }
+.tbl { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+.tbl th, .tbl td { padding: 8px 10px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--line); }
+.tbl th { position: sticky; top: 0; background: var(--surface-2); font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.tbl tr:last-child td { border-bottom: 0; }
+.chip .n { color: var(--muted); font-variant-numeric: tabular-nums; margin-left: 4px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 13px; font-size: 14px; font-weight: 500; cursor: pointer; color: var(--ink); }
 .chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
@@ -793,6 +799,7 @@ function renderProgress() {
     ${strengthHTML()}
     ${calendarHTML()}
     ${waistHTML()}
+    <div class="card quiet"><div class="between"><h3>Your data</h3><button class="btn ghost sm" data-act="data">View my data</button></div><p class="muted small">Every weigh-in, set and check-in as tables, ready to download as a spreadsheet.</p></div>
     <div class="card quiet"><h3>Progress photos</h3><p class="muted small">On the 1st of each month, take a front, side and back photo in the same spot and light. Keep them in your phone's gallery. On weeks the scale stalls, photos and your waist often still move.</p></div>`;
 }
 function weighListHTML() {
@@ -1265,10 +1272,64 @@ function whyHTML() {
     <div class="guide-body">${WHY.map(([h, t]) => `<div><h4>${h}</h4><p class="small">${t}</p></div>`).join("")}
     <div><h4>Sources</h4><ul class="small">${WHY_SOURCES.map(([u, t]) => `<li><a href="${u}" target="_blank" rel="noopener">${t}</a></li>`).join("")}</ul></div></div>`;
 }
+/* My data: every stored table, viewable and downloadable */
+let dl = null;
+const DATA_VIEWS = [["weights", "Weigh-ins"], ["workouts", "Workouts"], ["sets", "Sets"], ["waist", "Waist"], ["habits", "Daily basics"], ["checkins", "Check-ins"], ["profile", "Profile"]];
+const yn = v => v ? "yes" : "";
+function dataTable(view) {
+  const byDate = o => Object.values(o).filter(x => x && x.date).sort((a, b) => b.date.localeCompare(a.date));
+  if (view === "weights") return { head: ["Date", "Weight (kg)", "7-day avg (kg)"], rows: byDate(S.weights).map(w => [w.date, w.kg, fmt1(avgEnding(w.date))]) };
+  if (view === "workouts") return {
+    head: ["Date", "Session", "Phase", "Minutes", "Sets done", "Warm-up", "Incline walk", "Status"],
+    rows: Object.values(S.workouts).filter(Boolean).sort((a, b) => (b.date + (b.startedAt || 0)).localeCompare(a.date + (a.startedAt || 0)))
+      .map(w => [w.date, w.session, w.phase, w.durationSec ? Math.round(w.durationSec / 60) : "", (w.items || []).reduce((n, it) => n + (it.sets || []).filter(x => x.done).length, 0), yn(w.cardio && w.cardio.warmup), yn(w.cardio && w.cardio.finisher), w.status]),
+  };
+  if (view === "sets") {
+    const rows = [];
+    for (const w of doneWorkouts().reverse()) (w.items || []).forEach(it => (it.sets || []).forEach((x, j) => {
+      if (!x.done) return;
+      const e = EX[it.ex];
+      rows.push([w.date, w.session, e ? e.name : it.ex, j + 1, e && e.unit === "kg" ? x.kg : "", x.reps, e ? unitLabel(e) : "", x.rest ?? ""]);
+    }));
+    return { head: ["Date", "Session", "Exercise", "Set", "kg", "Reps / sec", "Unit", "Break before (s)"], rows };
+  }
+  if (view === "waist") return { head: ["Date", "Waist (cm)"], rows: byDate(S.waist).map(w => [w.date, w.cm]) };
+  if (view === "habits") return {
+    head: ["Date", "Protein each meal", "Half plate veg", "No sugary drinks", "Steps", "Sleep 7h+", "Calories", "Protein (g)"],
+    rows: byDate(S.habits).map(h => [h.date, yn(h.protein), yn(h.veg), yn(h.drinks), yn(h.steps), yn(h.sleep), h.kcal ?? "", h.proteinG ?? ""]),
+  };
+  if (view === "checkins") return {
+    head: ["Date", "Lost (kg/wk)", "Avg this week", "Avg last week", "Sleep", "Energy", "Soreness", "Hunger", "Workouts", "Changes made", "Coach review"],
+    rows: byDate(S.checkins).map(c => [c.date, c.rate ?? "", c.avgThis ?? "", c.avgPrev ?? "", c.sleep, c.energy, c.soreness, c.hunger, c.workouts, Object.entries(c.changes || {}).map(([k, v]) => `${k}: ${v}`).join("; "), c.coachNote || ""]),
+  };
+  return { head: ["Field", "Value"], rows: Object.entries(P() || {}).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, v && typeof v === "object" ? JSON.stringify(v) : v]) };
+}
+function dataHTML() {
+  const v = S.dataView || "weights", t = dataTable(v), shown = t.rows.slice(0, 200);
+  const count = k => k === "profile" ? (P() ? 1 : 0) : k === "sets" ? dataTable("sets").rows.length : Object.keys(S[k]).length;
+  return `<div class="between"><h2>My data</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+    <p class="small muted">Everything the app has saved to your Claude account, newest first. Only you can see it.</p>
+    <div class="chips" role="group" aria-label="Table">${DATA_VIEWS.map(([k, l]) => `<button class="chip" data-act="dview" data-v="${k}" aria-pressed="${v === k}">${l}<span class="n">${count(k)}</span></button>`).join("")}</div>
+    ${t.rows.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr>${t.head.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${shown.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
+      ${t.rows.length > 200 ? `<p class="small muted">Showing the latest 200 of ${t.rows.length} rows. The download has all of them.</p>` : ""}` : `<p class="muted small">Nothing logged here yet.</p>`}
+    ${dl ? `<div class="row"><button class="btn ghost sm" data-act="dl-csv" ${t.rows.length ? "" : "disabled"}>Download this table (CSV)</button><button class="btn ghost sm" data-act="dl-json">Download everything (JSON)</button></div>`
+      : `<p class="small muted">Downloads work when this page is open in Claude.</p>`}`;
+}
+const csvCell = v => { const x = String(v ?? ""); return /[",\n]/.test(x) ? `"${x.replace(/"/g, '""')}"` : x; };
+async function download(filename, data) {
+  if (!dl) return;
+  try { const r = await dl.save({ filename, data }); if (r && r.status === "saved") toast("Saved " + filename); }
+  catch (e) {
+    const c = e && e.code;
+    if (c === "declined") return;
+    toast(c === "rate_limited" ? "A save is already waiting for your answer" : "Downloads aren't available here");
+  }
+}
 function settingsHTML() {
   const p = P();
   const swaps = Object.entries(p.swaps || {});
   return `<div class="between"><h2>Settings</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+  <button class="btn ghost sm" data-act="data">View my data</button>
   <form class="form" data-form="settings">
     <label>Goal weight (kg)<input class="field" id="s-goal" inputmode="decimal" value="${p.goalKg}"></label>
     <label>Start weight (kg)<input class="field" id="s-start-kg" inputmode="decimal" value="${p.startKg}"></label>
@@ -1461,6 +1522,14 @@ document.addEventListener("click", e => {
     S.confirmDel = null; remove("weights", b.dataset.d); toast("Weigh-in deleted");
   }
   else if (act === "range") { S.range = +b.dataset.v; render(); }
+  else if (act === "data") openSheet(dataHTML());
+  else if (act === "dview") { S.dataView = b.dataset.v; openSheet(dataHTML()); }
+  else if (act === "dl-csv") {
+    const v = S.dataView || "weights", t = dataTable(v);
+    const csv = [t.head, ...t.rows].map(r => r.map(csvCell).join(",")).join("\r\n");
+    download(`first-rep-coach-${(DATA_VIEWS.find(x => x[0] === v) || [v, v])[1].toLowerCase().replace(/\s+/g, "-")}-${today()}.csv`, csv);
+  }
+  else if (act === "dl-json") download(`first-rep-coach-backup-${today()}.json`, JSON.stringify({ exportedAt: new Date().toISOString(), profile: S.profile, weights: S.weights, waist: S.waist, workouts: S.workouts, habits: S.habits, checkins: S.checkins }, null, 2));
   else if (act === "vphase") { S.viewPhase = +b.dataset.v; render(); }
   else if (act === "area") { S.area = b.dataset.v; delete S.draft["m-q"]; render(); }
   else if (act === "sex") { S.draft.sex = b.dataset.v; render(); }
@@ -1481,4 +1550,5 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 render();
 initStore();
 initSample();
+(async () => { try { dl = window.claude ? await window.claude.use("downloads") : null; } catch { dl = null; } })();
 </script>
