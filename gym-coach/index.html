@@ -204,6 +204,13 @@ details.guide summary .chev { width: 10px; height: 10px; border-right: 2px solid
 details.guide[open] summary .chev { transform: rotate(-135deg); }
 .guide-body { display: flex; flex-direction: column; gap: 12px; padding-bottom: 16px; }
 .guide-body h4 { margin: 0 0 4px; font-size: 12px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+.seg.wide { display: flex; }
+.seg.wide button { flex: 1; padding: 0 6px; }
+.rhythm { display: grid; grid-template-columns: 52px repeat(7, minmax(0, 1fr)); gap: 5px; align-items: center; }
+.rhythm .h, .rhythm .wk { font-size: 11px; color: var(--muted); }
+.rhythm .h { text-align: center; }
+.rh { aspect-ratio: 1; max-width: 100%; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); display: grid; place-items: center; font-family: var(--f-display); font-weight: 700; font-size: 16px; }
+.rh.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 13px; font-size: 14px; font-weight: 500; cursor: pointer; color: var(--ink); }
 .chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
@@ -273,7 +280,7 @@ details.guide[open] summary .chev { transform: rotate(-135deg); }
   <div class="tabs-in">
     <button class="tab" data-tab="today" aria-current="page"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Today</button>
     <button class="tab" data-tab="progress"><svg viewBox="0 0 24 24"><path d="M3.5 20.5h17"/><path d="M5 16l4.5-5.5 4 3.5L19.5 6"/></svg>Progress</button>
-    <button class="tab" data-tab="machines"><svg viewBox="0 0 24 24"><path d="M6.5 7.5v9M17.5 7.5v9M3.5 10v4M20.5 10v4M6.5 12h11"/></svg>Machines</button>
+    <button class="tab" data-tab="machines"><svg viewBox="0 0 24 24"><path d="M6.5 7.5v9M17.5 7.5v9M3.5 10v4M20.5 10v4M6.5 12h11"/></svg>Plan</button>
     <button class="tab" data-tab="coach"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H10l-6 4.5z"/></svg>Coach</button>
   </div>
 </nav>
@@ -433,8 +440,8 @@ const HABITS = [
 const COLS = ["profile", "weights", "waist", "workouts", "habits", "checkins"];
 const S = {
   profile: null, weights: {}, waist: {}, workouts: {}, habits: {}, checkins: {},
-  loaded: new Set(), mode: "loading", tab: "today", draft: {}, range: 4, area: "Plan",
-  openGuides: new Set(), ci: { sleep: 3, energy: 3, soreness: 2, hunger: 3 }, chat: [], readonly: false,
+  loaded: new Set(), mode: "loading", tab: "today", draft: {}, range: 4, area: "All",
+  openGuides: new Set(), viewPhase: 0, ci: { sleep: 3, energy: 3, soreness: 2, hunger: 3 }, chat: [], readonly: false,
 };
 let db = null;
 const queues = {};
@@ -668,7 +675,7 @@ function previewHTML(doneToday) {
       <li><span>Finisher: incline walk</span><span class="muted small">10–15 min</span><span class="sub">${FINISHER}</span></li>
     </ul>
     <div class="row"><button class="btn" data-act="start" data-s="${s}">Start session ${s}</button><button class="btn ghost" data-act="start" data-s="${other}">Do ${other} instead</button></div>
-    <button class="link small" data-act="why">Why this plan works, and the research behind it</button>
+    <button class="link small" data-tab="machines">See the whole plan: both sessions, every phase, how-to for each exercise</button>
   </div>`;
 }
 const TICK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
@@ -932,42 +939,71 @@ function checkinHTML() {
   </div>`;
 }
 
-/* Machines */
-function planExercises() { const ph = phaseNo(); const s = new Set(); ["A", "B"].forEach(x => programFor(ph, x).forEach(it => s.add(it.ex))); return s; }
-function guideBody(id) {
+/* Plan */
+const PHASE_INFO = {
+  1: ["Weeks 1–4", "Learn the machines", "Machines guide the movement, so you can learn each pattern safely and find your starting weights. 2–3 sets per exercise."],
+  2: ["Weeks 5–8", "Add dumbbells", "Goblet squat, dumbbell bench press, Romanian deadlift and dumbbell shoulder press join in. Most exercises go to 3 sets."],
+  3: ["Week 9 on", "Build", "Same exercises as phase 2 with 3 sets on everything. Keep adding weight whenever you reach the top of the rep range."],
+};
+const domId = k => k.replace(/[^a-z0-9]/gi, "-");
+function guideBody(id, scope) {
   const e = EX[id], mine = (P() && P().machineNotes && P().machineNotes[id]) || "";
   const q = encodeURIComponent(`how to ${e.name.replace(/\(.*\)/, "")} beginner form`);
+  const inId = "mn-" + domId(scope);
   return `<div><h4>Set up</h4><ol>${e.setup.map(x => `<li>${esc(x)}</li>`).join("")}</ol></div>
     <div><h4>Do it</h4><ol>${e.how.map(x => `<li>${esc(x)}</li>`).join("")}</ol></div>
     <div><h4>Avoid</h4><ul>${e.avoid.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
-    ${e.cardio ? "" : `<form class="inline-form" data-form="mnote" data-ex="${id}"><input class="field" id="mn-${id}" data-draft aria-label="Your machine settings" placeholder="Your settings, e.g. seat 4, back pad 2" value="${esc(dv("mn-" + id, mine))}"><button class="btn ghost">Save</button></form>`}
+    ${e.cardio ? "" : `<form class="inline-form" data-form="mnote" data-ex="${id}"><input class="field" id="${inId}" data-draft aria-label="Your machine settings" placeholder="Your settings, e.g. seat 4, back pad 2" value="${esc(dv(inId, mine))}"><button class="btn ghost">Save</button></form>`}
     <div class="row"><a href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">Watch how-to videos on YouTube ↗</a></div>
     ${e.alts && e.alts.length ? `<p class="small muted">Busy or missing? Try: ${e.alts.map(a => esc(EX[a].name)).join(", ")}</p>` : ""}`;
 }
+function guideRow(key, ex, title, sub, right = "") {
+  return `<details class="guide" data-key="${key}" ${S.openGuides.has(key) ? "open" : ""}><summary><span><h3>${title}</h3><span class="muted small">${sub}</span></span><span class="row">${right}<span class="chev"></span></span></summary><div class="guide-body">${guideBody(ex, key)}</div></details>`;
+}
+function planSessionHTML(ph, s) {
+  const cur = ph === phaseNo();
+  const rows = programFor(ph, s).map((it, k) => {
+    const e = EX[it.ex];
+    let right = "";
+    if (cur && e.unit === "kg") { const sg = suggest(it); if (sg.kg != null) right = `<span class="plate"><i></i>${kgStr(sg.kg)} kg</span>`; }
+    const sub = `${it.sets} × ${rangeStr(e, it.lo, it.hi)} · ${e.area}${it.ex !== it.slot ? ` · replaces ${esc(EX[it.slot].name)}` : ""}`;
+    return guideRow(`p${ph}${s}${k}-${it.ex}`, it.ex, `${k + 1}. ${esc(e.name)}`, sub, right);
+  }).join("");
+  return `<div class="card"><div class="between"><h2>Session ${s}</h2><span class="muted small">about 50 min</span></div>
+    <div>${guideRow(`p${ph}${s}w-bike`, "bike", "Warm-up", WARMUP)}${rows}${guideRow(`p${ph}${s}f-treadmill`, "treadmill", "Finisher: incline walk", FINISHER)}</div></div>`;
+}
+function rhythmHTML() {
+  const wk = (label, days) => `<span class="wk">${label}</span>` + days.map(d => `<span class="rh${d ? " on" : ""}">${d || ""}</span>`).join("");
+  return `<div class="rhythm"><span></span>${["M", "T", "W", "T", "F", "S", "S"].map(d => `<span class="h">${d}</span>`).join("")}
+    ${wk("Week 1", ["A", "", "B", "", "A", "", ""])}${wk("Week 2", ["B", "", "A", "", "B", "", ""])}</div>
+    <p class="small muted">Any 3 days with a rest day in between works. Sessions alternate, so the Today tab always shows which one is next. On rest days, just hit your steps.</p>`;
+}
 function renderMachines() {
   const el = $("#p-machines");
-  const inPlan = P() ? planExercises() : new Set();
+  if (needProfile(el)) return;
+  const ph = S.viewPhase || phaseNo(), now = phaseNo();
   const qv = (S.draft["m-q"] || "").trim().toLowerCase();
-  const tabs = ["Plan", ...AREAS, "All"];
   const ids = Object.keys(EX).filter(id => {
     const e = EX[id];
     if (qv) return (e.name + " " + e.area).toLowerCase().includes(qv);
-    if (S.area === "Plan") return inPlan.has(id) || e.cardio;
-    if (S.area === "All") return true;
-    return e.area === S.area;
+    return S.area === "All" || e.area === S.area;
   });
-  const list = ids.map(id => {
-    const e = EX[id];
-    return `<details class="guide" data-ex="${id}" ${S.openGuides.has(id) ? "open" : ""}><summary><span><h3>${esc(e.name)}</h3><span class="muted small">${e.area}${inPlan.has(id) ? " · in your plan" : ""}</span></span><span class="chev"></span></summary><div class="guide-body">${guideBody(id)}</div></details>`;
-  }).join("");
-  el.innerHTML = `<div class="head"><div class="eyebrow">Machine guide</div><h1>How to use the gym</h1></div>
-    <div class="card"><h3>First visit</h3><ul class="small">
+  const list = ids.map(id => guideRow(`lib-${id}`, id, esc(EX[id].name), EX[id].area)).join("");
+  el.innerHTML = `<div class="head"><div class="eyebrow">Your program</div><h1>The plan</h1></div>
+    <div class="seg wide" role="group" aria-label="Phase">${[1, 2, 3].map(n => `<button data-act="vphase" data-v="${n}" aria-pressed="${ph === n}">${PHASE_INFO[n][0]}${n === now ? " · now" : ""}</button>`).join("")}</div>
+    <div class="card"><h2>Phase ${ph}: ${PHASE_INFO[ph][1]}</h2><p class="small muted">${PHASE_INFO[ph][2]}</p>
+      ${rhythmHTML()}
+      <button class="link small" data-act="why">Why this plan works, and the research behind it</button></div>
+    ${planSessionHTML(ph, "A")}${planSessionHTML(ph, "B")}
+    <div class="card"><h3>Before your first visit</h3><ul class="small">
+      <li>Tap each exercise above and watch a video or two. Knowing the movement before you get there makes the first session much calmer.</li>
       <li>Go during staffed hours and ask the coach to show you the seat settings on the leg press, chest press and lat pulldown. Ask if your club does a free intro session.</li>
-      <li>Save your seat and pad numbers on each machine below. They show up during workouts.</li>
+      <li>Save your seat and pad numbers on each machine. They show up during workouts.</li>
       <li>Wipe the seat and handles after each machine, and put dumbbells back.</li>
       <li>Someone on a machine you need? Ask "how many sets left?" or tap Swap in your workout.</li></ul></div>
+    <div class="head"><div class="eyebrow">Machine guide</div><h2>Every machine and exercise</h2></div>
     <input class="field" id="m-q" data-draft type="search" aria-label="Search exercises" placeholder="Search machines and exercises" value="${esc(S.draft["m-q"] || "")}">
-    <div class="chips" role="group" aria-label="Filter">${tabs.map(t => `<button class="chip" data-act="area" data-v="${t}" aria-pressed="${!qv && S.area === t}">${t === "Plan" ? "In my plan" : t}</button>`).join("")}</div>
+    <div class="chips" role="group" aria-label="Filter">${["All", ...AREAS].map(t => `<button class="chip" data-act="area" data-v="${t}" aria-pressed="${!qv && S.area === t}">${t}</button>`).join("")}</div>
     <div class="card">${list || `<p class="muted small">No matches.</p>`}</div>`;
 }
 
@@ -1331,7 +1367,8 @@ document.addEventListener("input", e => {
 });
 document.addEventListener("toggle", e => {
   const d = e.target; if (!d.matches || !d.matches("details.guide")) return;
-  if (d.open) S.openGuides.add(d.dataset.ex); else S.openGuides.delete(d.dataset.ex);
+  const k = d.dataset.key || d.dataset.ex;
+  if (d.open) S.openGuides.add(k); else S.openGuides.delete(k);
 }, true);
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && !$("#sheet").hidden) closeSheet();
@@ -1370,8 +1407,8 @@ document.addEventListener("submit", e => {
     delete S.draft["f-kcal"]; delete S.draft["f-prot"];
     put("habits", D, { ...clone(S.habits[D] || {}), date: D, kcal: kcal == null ? null : Math.round(kcal), proteinG: pr == null ? null : Math.round(pr) }); toast("Food totals saved");
   } else if (kind === "mnote") {
-    const ex = f.dataset.ex, v = $("#mn-" + ex).value.trim().slice(0, 120);
-    delete S.draft["mn-" + ex]; saveProfile({ machineNotes: { ...((P() && P().machineNotes) || {}), [ex]: v } }); toast("Settings saved for " + EX[ex].name);
+    const ex = f.dataset.ex, inp = f.querySelector("input"), v = inp.value.trim().slice(0, 120);
+    delete S.draft[inp.id]; saveProfile({ machineNotes: { ...((P() && P().machineNotes) || {}), [ex]: v } }); toast("Settings saved for " + EX[ex].name);
   } else if (kind === "setup") {
     const kg = num($("#su-kg").value), h = num($("#su-h").value), age = num($("#su-age").value), goal = num($("#su-goal").value);
     if (!(kg > 30 && h > 120 && age >= 14 && goal > 30)) { toast("Fill in all four numbers"); return; }
@@ -1406,7 +1443,7 @@ document.addEventListener("click", e => {
     if (!S.confirmDiscard) { S.confirmDiscard = true; render(); setTimeout(() => { S.confirmDiscard = false; scheduleRender(); }, 4000); return; }
     S.confirmDiscard = false; const w = activeWorkout(); if (w) remove("workouts", w.id); stopRest(); T.hold = null; keepAwake(false); toast("Workout deleted");
   }
-  else if (act === "guide") openSheet(`<div class="between"><h2>${esc(EX[b.dataset.ex].name)}</h2><button class="btn ghost sm" data-act="close">Close</button></div><div class="guide-body">${guideBody(b.dataset.ex)}</div>`);
+  else if (act === "guide") openSheet(`<div class="between"><h2>${esc(EX[b.dataset.ex].name)}</h2><button class="btn ghost sm" data-act="close">Close</button></div><div class="guide-body">${guideBody(b.dataset.ex, "sheet")}</div>`);
   else if (act === "swap") openSheet(swapHTML(+b.dataset.i));
   else if (act === "do-swap") { applySwap(b.dataset.slot, b.dataset.ex === b.dataset.slot ? null : b.dataset.ex); closeSheet(); toast(`Swapped to ${EX[b.dataset.ex].name}`); }
   else if (act === "unswap") { applySwap(b.dataset.slot, null); closeSheet(); toast("Original exercise restored"); }
@@ -1424,6 +1461,7 @@ document.addEventListener("click", e => {
     S.confirmDel = null; remove("weights", b.dataset.d); toast("Weigh-in deleted");
   }
   else if (act === "range") { S.range = +b.dataset.v; render(); }
+  else if (act === "vphase") { S.viewPhase = +b.dataset.v; render(); }
   else if (act === "area") { S.area = b.dataset.v; delete S.draft["m-q"]; render(); }
   else if (act === "sex") { S.draft.sex = b.dataset.v; render(); }
   else if (act === "ci") { S.ci[b.dataset.k] = +b.dataset.v; render(); }
