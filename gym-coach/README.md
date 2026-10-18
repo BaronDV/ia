@@ -15,5 +15,8 @@ Opened outside Claude, it falls back to saving in the browser's local storage.
 
 - Full-body sessions A and B, alternating, 3 days a week.
 - Phase 1 (weeks 1–4) uses machines only, phase 2 (weeks 5–8) adds dumbbells, phase 3 adds sets.
-- Double progression: when every set hits the top of the rep range, the next session suggests more weight.
+- Phase 1: A = leg press, chest press, seated row, leg curl, plank; B = lat pulldown, leg press, shoulder press, leg curl, dead bug.
+- Double progression: when every set hits the top of the rep range, the next session suggests more weight (twice the jump if every set beat it by 3+ reps).
+- Sets end about 2 reps short of failure; 90 s rest (60 s for core). The rest timer counts up past zero and logs the break before each set; timed holds have their own stopwatch.
+- The first real weigh-in becomes the starting weight and recalculates calories.
 - Weekly check-in compares 7-day weight averages: two slow weeks (under 0.25 kg/week) lower calories by 150, and losing more than 1 kg/week raises them by 150.

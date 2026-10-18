@@ -222,6 +222,7 @@ details.guide[open] summary .chev { transform: rotate(-135deg); }
 .timer-l { font-size: 14px; flex: 1; min-width: 0; }
 .timer button { border: 1px solid currentColor; background: transparent; color: inherit; border-radius: 8px; min-height: 36px; padding: 0 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
 .timer-bar { height: 3px; background: var(--plate); width: 0; }
+.timer.over { background: var(--accent); color: var(--accent-ink); }
 
 .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
 .tabs-in { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
@@ -408,8 +409,8 @@ const AREAS = ["Legs", "Chest", "Back", "Shoulders", "Core", "Cardio"];
 
 const PROGRAM = {
   1: {
-    A: [["leg_press", 3, 10, 12], ["chest_press", 3, 10, 12], ["seated_row", 3, 10, 12], ["leg_curl", 2, 10, 12], ["plank", 2, 20, 40]],
-    B: [["lat_pulldown", 3, 10, 12], ["leg_press", 3, 10, 12], ["shoulder_press", 2, 10, 12], ["leg_extension", 2, 12, 15], ["dead_bug", 2, 8, 12]],
+    A: [["leg_press", 3, 10, 12], ["chest_press", 3, 10, 12], ["seated_row", 3, 10, 12], ["leg_curl", 2, 10, 15], ["plank", 2, 20, 40]],
+    B: [["lat_pulldown", 3, 10, 12], ["leg_press", 3, 10, 12], ["shoulder_press", 3, 10, 12], ["leg_curl", 2, 10, 15], ["dead_bug", 2, 8, 12]],
   },
   2: {
     A: [["leg_press", 3, 8, 12], ["db_bench", 3, 8, 12], ["seated_row", 3, 10, 12], ["db_rdl", 3, 8, 12], ["plank", 2, 30, 45]],
@@ -573,7 +574,9 @@ function suggest(item) {
   const allTop = last.sets.length >= nSets && last.sets.every(s => s.reps >= hi);
   const missed = x => x.sets.some(s => s.reps < lo);
   let next = kg, note, up = false;
-  if (allTop) { next = kg + e.inc; up = true; note = `You hit ${hi} on every set. Go up to ${kgStr(next)} kg.`; }
+  const wayOver = allTop && last.sets.every(s => s.reps >= hi + 3);
+  if (wayOver) { next = kg + 2 * e.inc; up = true; note = `Too light: ${hi + 3}+ reps on every set. Go up to ${kgStr(next)} kg.`; }
+  else if (allTop) { next = kg + e.inc; up = true; note = `You hit ${hi} on every set. Go up to ${kgStr(next)} kg.`; }
   else if (missed(last) && h[1] && missed(h[1]) && Math.max(...h[1].sets.map(s => s.kg || 0)) === kg) {
     next = Math.max(0, roundTo(kg * 0.9, e.inc)); note = `Under ${lo} reps twice in a row. Drop to ${kgStr(next)} kg and build back up.`;
   } else note = `Same weight. Last time: ${last.sets.map(s => s.reps).join(", ")} reps. Beat one of those.`;
@@ -631,6 +634,7 @@ function renderToday() {
   const el = $("#p-today");
   if (needProfile(el)) return;
   const D = today(), aw = activeWorkout();
+  if (aw) restoreRest();
   const doneToday = doneWorkouts().some(w => w.date === D);
   const mon = mondayOf(D);
   const weekDone = new Set(doneWorkouts().filter(w => w.date >= mon).map(w => w.date));
@@ -664,12 +668,18 @@ function previewHTML(doneToday) {
       <li><span>Finisher: incline walk</span><span class="muted small">10–15 min</span><span class="sub">${FINISHER}</span></li>
     </ul>
     <div class="row"><button class="btn" data-act="start" data-s="${s}">Start session ${s}</button><button class="btn ghost" data-act="start" data-s="${other}">Do ${other} instead</button></div>
+    <button class="link small" data-act="why">Why this plan works, and the research behind it</button>
   </div>`;
 }
 const TICK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 function activeHTML(w) {
+  const firstKg = (w.items || []).findIndex(x => EX[x.ex] && EX[x.ex].unit === "kg");
   const items = (w.items || []).map((it, i) => {
     const e = EX[it.ex] || { name: it.ex, unit: "kg" }, sg = suggest(it);
+    const nextJ = (it.sets || []).findIndex(x => !x.done);
+    const holdBtn = e.unit === "s" && nextJ >= 0 ? `<button class="btn ghost block" data-act="hold" data-i="${i}">${T.hold && T.hold.i === i ? `Stop timer · <span class="num" id="hold-t">0:00</span>` : `Start timer for set ${nextJ + 1}`}</button>` : "";
+    const rests = (it.sets || []).filter(x => x.done && x.rest).map(x => mmss(x.rest));
+    const breaks = rests.length ? `<p class="small muted">Time since previous set: ${rests.join(" · ")}</p>` : "";
     const mine = P().machineNotes && P().machineNotes[it.ex];
     const sets = (it.sets || []).map((s, j) => {
       const kgId = `w-${i}-${j}-kg`, rId = `w-${i}-${j}-r`;
@@ -688,14 +698,17 @@ function activeHTML(w) {
       <div class="ex-head"><div><h3>${esc(e.name)}</h3><p class="muted small">${it.sets.length} × ${rangeStr(e, it.lo, it.hi)}${e.perHand ? " · kg per dumbbell" : ""}</p></div>
         <div class="ex-tools"><button class="btn ghost sm" data-act="guide" data-ex="${it.ex}">How to</button><button class="btn ghost sm" data-act="swap" data-i="${i}">Swap</button></div></div>
       <p class="hint${sg.up ? " up" : ""}">${esc(sg.note)}</p>
+      ${i === firstKg && !it.sets.some(x => x.done) ? `<p class="mine">Warm-up set first: 10 easy reps at about half your working weight. Don't log it.</p>` : ""}
       ${mine ? `<p class="mine">Your settings: ${esc(mine)}</p>` : ""}
-      <div class="sets">${sets}</div>
+      <div class="sets">${sets}</div>${holdBtn}${breaks}
     </article>`;
   }).join("");
   const c = w.cardio || {};
   const doneSets = (w.items || []).reduce((n, it) => n + (it.sets || []).filter(s => s.done).length, 0);
   return `<div class="card">
-    <div class="between"><h2>Session ${w.session}</h2><span class="muted small">${doneSets} sets done</span></div>
+    <div class="between"><h2>Session ${w.session}</h2><span class="muted small"><span class="num" id="w-clock">0:00</span> · ${doneSets} sets done</span></div>
+    <p class="small muted">End each set when you have about 2 good reps left in the tank. If your form starts to break down, the set is over.</p>
+    <div class="row"><span class="small muted">Start a rest timer:</span>${[60, 90, 120, 180].map(v => `<button class="chip" data-act="rest-go" data-v="${v}">${mmss(v)}</button>`).join("")}</div>
     <label class="check"><input type="checkbox" data-act="cardio" data-k="warmup" ${c.warmup ? "checked" : ""}><span>Warm-up done<small>${WARMUP}</small></span></label>
     ${items}
     <label class="check"><input type="checkbox" data-act="cardio" data-k="finisher" ${c.finisher ? "checked" : ""}><span>Incline walk done<small>${FINISHER}</small></span></label>
@@ -707,7 +720,8 @@ function weighHTML() {
   const D = today(), w = S.weights[D], avg = avgEnding(D);
   return `<div class="card">
     <div class="between"><h3>Morning weigh-in</h3>${avg != null ? `<span class="muted small">7-day avg <b class="num">${fmt1(avg)}</b> kg</span>` : ""}</div>
-    <p class="muted small">After the toilet, before eating or drinking. Daily numbers jump around; the 7-day average is what counts.</p>
+    ${P().startPending ? `<p class="pill blue">Your first weigh-in becomes your starting weight</p>` : ""}
+    <p class="muted small">Every morning if you can, at least 3 a week: after the toilet, before eating or drinking. Daily numbers jump 1–2 kg; the 7-day average is what counts.</p>
     <form class="inline-form" data-form="weight"><input class="field" id="wt" data-draft inputmode="decimal" autocomplete="off" aria-label="Today's weight in kg" placeholder="Weight in kg" value="${esc(dv("wt", w ? w.kg : ""))}"><button class="btn">${w ? "Update" : "Save"}</button></form>
   </div>`;
 }
@@ -759,19 +773,24 @@ function renderProgress() {
     <div class="card">
       <div class="between"><h2>Body weight</h2><div class="seg" role="group" aria-label="Range">${[[4, "4 wk"], [12, "12 wk"], [0, "All"]].map(([v, l]) => `<button data-act="range" data-v="${v}" aria-pressed="${S.range === v}">${l}</button>`).join("")}</div></div>
       <div class="stats four">
-        <div class="stat"><div class="v">${fmt1(p.startKg)}</div><div class="l">start, kg</div></div>
+        <div class="stat"><div class="v">${fmt1(p.startKg)}</div><div class="l">${p.startPending ? "start (estimate)" : "start, kg"}</div></div>
         <div class="stat"><div class="v">${fmt1(cur)}</div><div class="l">now (7-day avg)</div></div>
         <div class="stat"><div class="v ${lost > 0 ? "good" : ""}">${lost == null ? "–" : (lost >= 0 ? "−" : "+") + fmt1(Math.abs(lost))}</div><div class="l">change, kg</div></div>
         <div class="stat"><div class="v">${toGo == null ? "–" : fmt1(Math.max(0, toGo))}</div><div class="l">to ${fmt1(p.goalKg)} kg goal</div></div>
       </div>
       ${weightChart()}
       <p class="small"><b>Goal ETA:</b> <span class="muted">${esc(eta)}</span></p>
+      ${weighListHTML()}
     </div>
     ${checkinHTML()}
     ${strengthHTML()}
     ${calendarHTML()}
     ${waistHTML()}
     <div class="card quiet"><h3>Progress photos</h3><p class="muted small">On the 1st of each month, take a front, side and back photo in the same spot and light. Keep them in your phone's gallery. On weeks the scale stalls, photos and your waist often still move.</p></div>`;
+}
+function weighListHTML() {
+  const list = weightSeries().slice(-10).reverse(); if (!list.length) return "";
+  return `<details class="guide" data-ex="weighins" ${S.openGuides.has("weighins") ? "open" : ""}><summary><span class="small"><b>Edit weigh-ins</b></span><span class="chev"></span></summary><div class="guide-body">${list.map(w => `<div class="between"><span class="small">${fmtDate(w.date, { weekday: "short", day: "numeric", month: "short" })}: <b class="num">${fmt1(w.kg)}</b> kg</span><button class="btn danger sm" data-act="del-weight" data-d="${w.date}">${S.confirmDel === w.date ? "Tap again to delete" : "Delete"}</button></div>`).join("")}</div></details>`;
 }
 function weekCardHTML() {
   const D = today(), mon = mondayOf(D), p = P();
@@ -974,7 +993,7 @@ function coachRules() {
   return `You are the coach inside First Rep Coach, a gym app for a complete beginner who trains 3 days a week at an Anytime Fitness club with a fat-loss goal.
 Be warm, direct and practical. Keep answers under 150 words unless asked for more. Plain text only: short paragraphs or a few "- " bullets, no headings, no tables, no markdown bold.
 Use the user's real data below and give concrete numbers (kg, reps, grams, steps, minutes).
-Training approach: full-body sessions A and B alternating, machines first (phase 1), dumbbells from week 5. Double progression: add weight once every set reaches the top of the rep range.
+Training approach: full-body sessions A and B alternating, machines first (phase 1), dumbbells from week 5. Double progression: add weight once every set reaches the top of the rep range. Sets end with about 2 good reps left (no training to failure). Rest 90 s between sets, 60 s for core.
 Nutrition approach: a moderate deficit, the protein target, simple habits. Never suggest under 1,800 kcal for a man or 1,400 for a woman, crash diets, fat burners or skipping meals.
 Safety: you are not a doctor. For sharp pain, joint pain that lingers, chest pain, dizziness or numbness, tell them to stop that exercise and see a doctor or physiotherapist, and offer a pain-free alternative.
 ${sampleTools ? "You can change the plan with your tools. Only do that when the user asks for a change or agrees to one you suggested, then say exactly what you changed." : "You cannot change the plan yourself. Tell the user which button to use: Swap on an exercise, or Settings for targets."}`;
@@ -1124,7 +1143,7 @@ let toastT = null;
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 2600); }
 function showBanner(msg) { const b = $("#banner"); b.textContent = msg; b.hidden = false; }
 
-let restEnd = 0, restLen = 90, restTick = null, audio = null;
+let audio = null;
 function beep() {
   try {
     audio = audio || new (window.AudioContext || window.webkitAudioContext)();
@@ -1134,19 +1153,45 @@ function beep() {
   } catch {}
   try { navigator.vibrate && navigator.vibrate(200); } catch {}
 }
-function startRest(sec) {
-  restLen = sec; restEnd = Date.now() + sec * 1000;
-  $("#timer").hidden = false; $("#timer-l").textContent = "Rest, then the next set";
-  clearInterval(restTick); restTick = setInterval(tickRest, 250); tickRest();
+const T = { on: false, start: 0, target: 90, beeped: false, hold: null, restored: false };
+const mmss = sec => `${Math.floor(sec / 60)}:${pad(sec % 60)}`;
+function restFor(ex) { const e = EX[ex]; return e && e.area === "Core" ? 60 : (P() && P().rest) || 90; }
+function startRest(sec, from = Date.now()) {
+  T.on = true; T.start = from; T.target = sec; T.beeped = Date.now() - from >= sec * 1000;
+  $("#timer").hidden = false; tick();
 }
-function tickRest() {
-  const left = Math.max(0, Math.ceil((restEnd - Date.now()) / 1000));
-  $("#timer-t").textContent = `${Math.floor(left / 60)}:${pad(left % 60)}`;
-  $("#timer-bar").style.width = `${100 - (left / restLen) * 100}%`;
-  if (left <= 0) {
-    clearInterval(restTick); restTick = null; $("#timer-l").textContent = "Rest done. Next set.";
-    beep(); setTimeout(() => { if (!restTick) $("#timer").hidden = true; }, 5000);
+function stopRest() { T.on = false; $("#timer").hidden = true; $("#timer").classList.remove("over"); }
+function tick() {
+  const now = Date.now();
+  if (T.on) {
+    const el = Math.floor((now - T.start) / 1000), left = T.target - el, box = $("#timer");
+    if (left > 0) {
+      $("#timer-t").textContent = mmss(left); $("#timer-l").textContent = "Rest, then the next set";
+      $("#timer-bar").style.width = `${Math.min(100, (el / T.target) * 100)}%`; box.classList.remove("over");
+    } else {
+      $("#timer-t").textContent = "+" + mmss(-left); $("#timer-l").textContent = `Rested ${mmss(el)}. Go when you're ready.`;
+      $("#timer-bar").style.width = "100%"; box.classList.add("over");
+      if (!T.beeped) { T.beeped = true; beep(); }
+      if (-left > 900) stopRest();
+    }
   }
+  const aw = S.loaded.size >= COLS.length ? activeWorkout() : null;
+  const wc = document.getElementById("w-clock");
+  if (wc && aw) wc.textContent = mmss(Math.max(0, Math.floor((now - aw.startedAt) / 1000)));
+  const ht = document.getElementById("hold-t");
+  if (ht && T.hold) {
+    const sec = Math.floor((now - T.hold.start) / 1000); ht.textContent = mmss(sec);
+    if (!T.hold.beeped && sec >= T.hold.target) { T.hold.beeped = true; beep(); }
+  }
+}
+setInterval(tick, 250);
+function restoreRest() {
+  if (T.restored || T.on) return;
+  const aw = activeWorkout(); if (!aw) return;
+  T.restored = true;
+  let last = null;
+  aw.items.forEach(it => it.sets.forEach(x => { if (x.done && x.at && (!last || x.at > last.at)) last = { at: x.at, ex: it.ex }; }));
+  if (last && Date.now() - last.at < 600000) startRest(restFor(last.ex), last.at);
 }
 let wakeLock = null;
 async function keepAwake(on) {
@@ -1156,6 +1201,34 @@ async function keepAwake(on) {
   } catch {}
 }
 
+const WHY = [
+  ["3 full-body days", "Every session trains legs, a push and a pull, so each major muscle works 1–2 times a week. When weekly sets are equal, how you spread them over the week makes little difference to muscle growth. Full-body days mean a missed session doesn't skip a muscle for a week."],
+  ["How many sets", "About 6–10 hard sets per muscle per week to start, rising in phases 2 and 3. Beginners make real gains on little volume. More sets keep helping with diminishing returns, so volume grows once the moves feel familiar."],
+  ["Reps and effort", "8–15 reps, ending each set with about 2 good reps left. Light and heavy weights build similar muscle when the sets are hard, and going all the way to failure isn't needed."],
+  ["Adding weight", "Hit the top of the rep range on every set and the weight goes up next time. Far too light (3+ reps over)? It jumps twice as far."],
+  ["Rest", "90 seconds, 60 for core. Resting over 60 s builds a little more muscle than shorter rests; past about 90 s studies find little extra. Still out of breath? Take longer. The timer keeps counting."],
+  ["Machines first", "Machines and free weights build similar muscle. Strength carries over best to what you practise, so dumbbells join in week 5 once you have the basics."],
+  ["Walking after lifting", "Adding cardio barely dents muscle and strength gains. Easy incline walking after weights burns extra calories without hurting recovery."],
+  ["Lifting while losing fat", "Lifting during a calorie deficit protects muscle, so more of the weight you lose comes from fat."],
+  ["Tracking", "Weigh daily, judge the weekly average, change calories only after 2 slow weeks. In trials, daily weighing led to more weight loss than weighing less often."],
+];
+const WHY_SOURCES = [
+  ["https://pubmed.ncbi.nlm.nih.gov/27102172/", "Training frequency and muscle growth (Schoenfeld et al., 2016)"],
+  ["https://pubmed.ncbi.nlm.nih.gov/41343037/", "Weekly volume and frequency dose-response (Pelland et al., 2025)"],
+  ["https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10933173/", "Minimal effective training for beginners (2024 review)"],
+  ["https://pubmed.ncbi.nlm.nih.gov/28834797/", "Low vs high load training (Schoenfeld et al., 2017)"],
+  ["https://rke.abertay.ac.uk/en/publications/exploring-the-dose-response-relationship-between-estimated-resist/", "Proximity to failure (Robinson et al., 2024)"],
+  ["https://www.frontiersin.org/journals/sports-and-active-living/articles/10.3389/fspor.2024.1429789/text", "Rest between sets (Singer et al., 2024)"],
+  ["https://doaj.org/article/a7282dba5e674176bde2a8239832d2f7", "Free weights vs machines (Haugen et al., 2023)"],
+  ["https://addi.ehu.es/handle/10810/60866", "Cardio and muscle growth interference (systematic review)"],
+  ["https://pubmed.ncbi.nlm.nih.gov/29352654/", "Resistance training preserves muscle while dieting"],
+  ["https://blog.nasm.org/fitness/research-in-review-will-weighing-in-every-day-improve-weight-control-behaviors", "Daily self-weighing trials (Steinberg et al.)"],
+];
+function whyHTML() {
+  return `<div class="between"><h2>Why this plan works</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+    <div class="guide-body">${WHY.map(([h, t]) => `<div><h4>${h}</h4><p class="small">${t}</p></div>`).join("")}
+    <div><h4>Sources</h4><ul class="small">${WHY_SOURCES.map(([u, t]) => `<li><a href="${u}" target="_blank" rel="noopener">${t}</a></li>`).join("")}</ul></div></div>`;
+}
 function settingsHTML() {
   const p = P();
   const swaps = Object.entries(p.swaps || {});
@@ -1198,38 +1271,58 @@ function startWorkout(session) {
   put("workouts", id, { id, date: D, session, phase: ph, status: "active", startedAt: Date.now(), items, cardio: { warmup: false, finisher: false } });
   keepAwake(true); window.scrollTo({ top: 0 });
 }
+function lastDoneAt(w) { let t = 0; w.items.forEach(it => it.sets.forEach(x => { if (x.done && x.at > t) t = x.at; })); return t; }
+function markDone(w, i, j, reps, kg) {
+  const it = w.items[i], s = it.sets[j], now = Date.now(), prev = lastDoneAt(w);
+  if (kg != null) {
+    s.kg = kg;
+    for (let k = j + 1; k < it.sets.length; k++) if (!it.sets[k].done) { it.sets[k].kg = kg; delete S.draft[`w-${i}-${k}-kg`]; }
+  }
+  s.reps = reps; s.done = true; s.at = now;
+  s.rest = prev && now - prev < 1200000 ? Math.round((now - prev) / 1000) : null;
+  startRest(it.sets.every(x => x.done) ? 120 : restFor(it.ex));
+}
 function toggleSet(i, j) {
   const w = clone(activeWorkout()); if (!w) return;
   const it = w.items[i], s = it.sets[j], e = EX[it.ex];
   const kId = `w-${i}-${j}-kg`, rId = `w-${i}-${j}-r`;
-  if (s.done) { s.done = false; }
+  if (s.done) { s.done = false; delete s.at; delete s.rest; }
   else {
     const reps = num($("#" + rId).value);
     if (!(reps > 0)) { $("#" + rId).focus(); toast(e.unit === "s" ? "Enter how many seconds you held" : "Enter how many reps you did"); return; }
+    let kg = null;
     if (e.unit === "kg") {
-      const kg = num($("#" + kId).value);
+      kg = num($("#" + kId).value);
       if (kg == null || kg < 0) { $("#" + kId).focus(); toast("Enter the weight you used"); return; }
-      s.kg = kg;
-      for (let k = j + 1; k < it.sets.length; k++) if (!it.sets[k].done) { it.sets[k].kg = kg; delete S.draft[`w-${i}-${k}-kg`]; }
     }
-    s.reps = reps; s.done = true;
-    const last = it.sets.every(x => x.done);
-    startRest(last ? 120 : e.area === "Core" ? 60 : (P().rest || 90));
+    markDone(w, i, j, reps, kg);
   }
   delete S.draft[kId]; delete S.draft[rId];
   put("workouts", w.id, w);
+}
+function toggleHold(i) {
+  const aw = activeWorkout(); if (!aw) return;
+  if (!T.hold) {
+    const it = aw.items[i], sg = suggest(it);
+    T.hold = { i, start: Date.now(), target: sg.target || it.lo, beeped: false }; stopRest(); render(); return;
+  }
+  const secs = Math.round((Date.now() - T.hold.start) / 1000), hi = T.hold.i; T.hold = null;
+  const w = clone(aw), it = w.items[hi], j = it.sets.findIndex(x => !x.done);
+  if (j < 0 || secs < 1) { render(); return; }
+  delete S.draft[`w-${hi}-${j}-r`];
+  markDone(w, hi, j, secs, null); put("workouts", w.id, w); toast(`Set ${j + 1}: held ${secs} s`);
 }
 function finishWorkout() {
   const w = clone(activeWorkout()); if (!w) return;
   const done = w.items.reduce((n, it) => n + it.sets.filter(s => s.done).length, 0);
   if (!done) { toast("Log at least one set first, or discard the workout."); return; }
-  w.status = "done"; w.finishedAt = Date.now();
+  w.status = "done"; w.finishedAt = Date.now(); w.durationSec = Math.round((w.finishedAt - w.startedAt) / 1000);
   Object.keys(S.draft).filter(k => k.startsWith("w-")).forEach(k => delete S.draft[k]);
   put("workouts", w.id, w).then(() => {
     const ups = w.items.filter(it => suggest({ ...it, sets: it.sets }).up).length;
     toast(ups ? `Workout saved. ${ups} lift${ups > 1 ? "s" : ""} go${ups > 1 ? "" : "es"} up next time.` : "Workout saved. Nice work.");
   });
-  $("#timer").hidden = true; clearInterval(restTick); restTick = null; keepAwake(false); window.scrollTo({ top: 0 });
+  stopRest(); T.hold = null; keepAwake(false); window.scrollTo({ top: 0 });
 }
 
 document.addEventListener("input", e => {
@@ -1262,7 +1355,12 @@ document.addEventListener("submit", e => {
   if (kind === "weight") {
     const v = num($("#wt").value);
     if (!(v > 30 && v < 300)) { toast("Enter your weight in kg, like 97.6"); return; }
-    delete S.draft.wt; put("weights", D, { date: D, kg: round1(v) }); toast("Weight saved");
+    delete S.draft.wt; put("weights", D, { date: D, kg: round1(v) });
+    if (P().startPending) {
+      const kcal = computeTargets({ ...P(), startKg: round1(v) }).kcal;
+      saveProfile({ startKg: round1(v), kcal, startPending: false });
+      toast(`Starting weight set to ${fmt1(v)} kg. Calories: ${thousands(kcal)} a day.`);
+    } else toast("Weight saved");
   } else if (kind === "waist") {
     const v = num($("#waist").value);
     if (!(v > 40 && v < 200)) { toast("Enter your waist in cm, like 104"); return; }
@@ -1288,7 +1386,9 @@ document.addEventListener("submit", e => {
       kcal: Math.round(g("#s-kcal") || p.kcal), protein: Math.round(g("#s-prot") || p.protein), steps: Math.round(g("#s-steps") || p.steps), rest: Math.max(30, Math.round(g("#s-rest") || 90)),
       phase: $("#s-phase").value, foodMode: $("#s-food").value, startDate: $("#s-date").value || p.startDate,
     };
-    saveProfile(patch); closeSheet(); toast("Settings saved");
+    const moved = patch.startKg !== p.startKg;
+    if (moved) { patch.startPending = false; if (patch.kcal === p.kcal) patch.kcal = computeTargets({ ...p, ...patch }).kcal; }
+    saveProfile(patch); closeSheet(); toast(moved ? `Start weight ${fmt1(patch.startKg)} kg. Calories now ${thousands(patch.kcal)}.` : "Settings saved");
   } else if (kind === "chat") {
     const v = $("#chat-in").value; $("#chat-in").value = ""; sendChat(v);
   }
@@ -1304,7 +1404,7 @@ document.addEventListener("click", e => {
   else if (act === "finish") finishWorkout();
   else if (act === "discard") {
     if (!S.confirmDiscard) { S.confirmDiscard = true; render(); setTimeout(() => { S.confirmDiscard = false; scheduleRender(); }, 4000); return; }
-    S.confirmDiscard = false; const w = activeWorkout(); if (w) remove("workouts", w.id); keepAwake(false); toast("Workout deleted");
+    S.confirmDiscard = false; const w = activeWorkout(); if (w) remove("workouts", w.id); stopRest(); T.hold = null; keepAwake(false); toast("Workout deleted");
   }
   else if (act === "guide") openSheet(`<div class="between"><h2>${esc(EX[b.dataset.ex].name)}</h2><button class="btn ghost sm" data-act="close">Close</button></div><div class="guide-body">${guideBody(b.dataset.ex)}</div>`);
   else if (act === "swap") openSheet(swapHTML(+b.dataset.i));
@@ -1314,8 +1414,15 @@ document.addEventListener("click", e => {
   else if (act === "settings") { if (P()) openSheet(settingsHTML()); }
   else if (act === "recalc") { const t = computeTargets({ ...P(), startKg: currentWeight() || P().startKg }); saveProfile(t); closeSheet(); toast(`Targets: ${thousands(t.kcal)} kcal, ${t.protein} g protein`); }
   else if (act === "end-deload") { saveProfile({ deloadUntil: null }); closeSheet(); toast("Easy week ended"); }
-  else if (act === "rest-add") { restEnd += 30000; restLen += 30; if (!restTick) { restTick = setInterval(tickRest, 250); } tickRest(); }
-  else if (act === "rest-skip") { clearInterval(restTick); restTick = null; $("#timer").hidden = true; }
+  else if (act === "rest-add") { if (T.on) { const el = Math.ceil((Date.now() - T.start) / 1000); T.target = Math.max(T.target, el) + 30; T.beeped = false; tick(); } }
+  else if (act === "rest-skip") stopRest();
+  else if (act === "rest-go") startRest(+b.dataset.v);
+  else if (act === "hold") toggleHold(+b.dataset.i);
+  else if (act === "why") openSheet(whyHTML());
+  else if (act === "del-weight") {
+    if (S.confirmDel !== b.dataset.d) { S.confirmDel = b.dataset.d; render(); return; }
+    S.confirmDel = null; remove("weights", b.dataset.d); toast("Weigh-in deleted");
+  }
   else if (act === "range") { S.range = +b.dataset.v; render(); }
   else if (act === "area") { S.area = b.dataset.v; delete S.draft["m-q"]; render(); }
   else if (act === "sex") { S.draft.sex = b.dataset.v; render(); }
