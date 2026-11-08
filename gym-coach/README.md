@@ -14,7 +14,7 @@ Opened outside Claude, it falls back to saving in the browser's local storage.
 ## The plan it runs
 
 - Full-body sessions A and B, alternating, 3 days a week.
-- Phases advance by workouts completed, not calendar weeks: phase 1 (workouts 1–12) uses machines and cables, phase 2 (13–24) adds dumbbells, phase 3 adds sets. The first 2 workouts are a light intro with 2 sets each.
+- Phases advance by workouts completed, not calendar weeks: phase 1 (workouts 1–12) uses machines and cables, phase 2 (13–24) adds dumbbells, phase 3 adds a third set for arms. Phase 2 also adds lateral raises; lifting weights can be logged in kg or lb. The first 2 workouts are a light intro with 2 sets each.
 - Phase 1: A = leg press, chest press, seated row, leg curl, cable curl, triceps pushdown, ab crunch machine; B = lat pulldown, leg press, shoulder press, leg curl, cable curl, triceps pushdown, Pallof press. All machines and cables, no floor work.
 - Double progression: when every set hits the top of the rep range, the next session suggests more weight (twice the jump if every set beat it by 3+ reps).
 - Sets end about 2 reps short of failure; 90 s rest (60 s for arms and core). The rest timer counts up past zero and logs the break before each set; timed holds have their own stopwatch.

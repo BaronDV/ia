@@ -383,7 +383,7 @@ const EX = {
     setup: ["Set a cable handle at chest height.", "Stand side-on to the machine, feet shoulder-width, holding the handle at your chest with both hands.", "Step away until you feel tension."],
     how: ["Press the handle straight out in front of your chest.", "Resist the cable pulling you round. Your body stays square.", "Bring it back to your chest. Do all your reps, then face the other way."],
     avoid: ["Letting your body twist toward the machine.", "Standing so close there's no tension."],
-    alts: ["ab_crunch_machine", "cable_crunch"] },
+    alts: ["ab_crunch_machine", "cable_crunch", "knee_raise"] },
   goblet_squat: { name: "Goblet squat (dumbbell)", area: "Legs", unit: "kg", inc: 2,
     setup: ["Hold one dumbbell upright against your chest, both hands cupping the top end.", "Feet a little wider than shoulder-width, toes turned out slightly."],
     how: ["Sit down between your heels, keeping your chest up.", "Go as low as you can while your heels stay down and your back stays flat.", "Stand up by pushing through your whole foot."],
@@ -419,6 +419,21 @@ const EX = {
     how: ["Lower your chest to the bench.", "Push back up.", "Over the weeks, use a lower surface to make it harder."],
     avoid: ["Hips sagging.", "Elbows flared straight out."],
     alts: ["chest_press", "db_bench"] },
+  lateral_raise: { name: "Lateral raise machine", area: "Shoulders", unit: "kg", inc: 2.5,
+    setup: ["Set the seat so your shoulders line up with the machine's pivot points.", "Sit tall with your chest against the pad and the arm pads resting on the outside of your upper arms."],
+    how: ["Raise your arms out to the sides until your elbows reach shoulder height.", "Pause for a second.", "Lower slowly, keeping a little tension at the bottom."],
+    avoid: ["Shrugging your shoulders up toward your ears.", "Swinging the weight up with your body.", "Going heavy: this muscle is small, so light weight with clean reps works best."],
+    alts: ["cable_lateral_raise", "db_lateral_raise"] },
+  cable_lateral_raise: { name: "Cable lateral raise", area: "Shoulders", unit: "kg", inc: 2.5, side: true,
+    setup: ["Set a handle on the low cable.", "Stand side-on to the machine and grab the handle with the hand farther from it."],
+    how: ["Raise your arm out to the side until your elbow reaches shoulder height.", "Lower slowly. Do all your reps, then switch arms."],
+    avoid: ["Shrugging your shoulder up.", "Leaning away to swing the weight."],
+    alts: ["lateral_raise", "db_lateral_raise"] },
+  db_lateral_raise: { name: "Dumbbell lateral raise", area: "Shoulders", unit: "kg", inc: 1, perHand: true,
+    setup: ["Stand tall with a light dumbbell in each hand at your sides."],
+    how: ["Raise both arms out to the sides, elbows slightly bent, until they reach shoulder height.", "Lower slowly."],
+    avoid: ["Shrugging.", "Swinging the dumbbells up with your back.", "Going so heavy that your form breaks."],
+    alts: ["lateral_raise", "cable_lateral_raise"] },
   cable_curl: { name: "Cable biceps curl", area: "Arms", unit: "kg", inc: 2.5,
     setup: ["Attach a straight or EZ bar to the low cable.", "Stand facing the machine, feet hip-width, holding the bar palms up with your arms straight."],
     how: ["Keep your elbows pinned to your sides.", "Curl the bar up toward your shoulders.", "Squeeze for a second, then lower slowly until your arms are straight."],
@@ -479,7 +494,7 @@ const PROGRAM = {
   },
   2: {
     A: [["leg_press", 3, 8, 12], ["db_bench", 3, 8, 12], ["seated_row", 3, 10, 12], ["db_rdl", 3, 8, 12], ["cable_curl", 2, 10, 15], ["triceps_pushdown", 2, 10, 15], ["ab_crunch_machine", 2, 10, 15]],
-    B: [["goblet_squat", 3, 8, 12], ["lat_pulldown", 3, 10, 12], ["db_shoulder_press", 3, 8, 12], ["leg_curl", 2, 10, 15], ["cable_curl", 2, 10, 15], ["triceps_pushdown", 2, 10, 15], ["knee_raise", 2, 8, 15]],
+    B: [["goblet_squat", 3, 8, 12], ["lat_pulldown", 3, 10, 12], ["db_shoulder_press", 3, 8, 12], ["leg_curl", 2, 10, 15], ["lateral_raise", 2, 12, 15], ["cable_curl", 2, 10, 15], ["triceps_pushdown", 2, 10, 15], ["pallof_press", 2, 10, 12]],
   },
 };
 const SLOTS = new Set(Object.values(PROGRAM).flatMap(p => Object.values(p).flatMap(s => s.map(x => x[0]))));
@@ -588,6 +603,14 @@ function phaseNo() {
   const n = doneWorkouts().length;
   return n < 12 ? 1 : n < 24 ? 2 : 3;
 }
+function sessionMinutes(items) {
+  let sec = 0;
+  for (const it of items) {
+    const e = EX[it.ex], sets = Array.isArray(it.sets) ? it.sets.length : it.sets, work = e.side ? 75 : 40;
+    sec += sets * work + (sets - 1) * restFor(it.ex) + 90;
+  }
+  return roundTo(sec / 60 + 5 + 12, 5);
+}
 function introOn() { return (!P() || !P().phase || P().phase === "auto") && doneWorkouts().length < 2; }
 function deloadOn() { return !!(P() && P().deloadUntil && today() <= P().deloadUntil); }
 function exFor(slot) { const sw = P() && P().swaps && P().swaps[slot]; return sw && EX[sw] ? sw : slot; }
@@ -595,7 +618,7 @@ function programFor(ph, session) {
   return PROGRAM[Math.min(ph, 2)][session].map(([slot, sets, lo, hi]) => {
     const ex = exFor(slot); const e = EX[ex];
     if (e.unit !== EX[slot].unit && e.rng) [lo, hi] = e.rng;
-    let n = ph >= 3 && EX[slot].area !== "Core" ? Math.max(sets, 3) : sets;
+    let n = ph >= 3 && EX[slot].area === "Arms" ? Math.max(sets, 3) : sets;
     if (deloadOn()) n = Math.max(1, n - 1);
     if (introOn() && ph === 1) n = Math.min(n, 2);
     return { slot, ex, sets: n, lo, hi };
@@ -606,7 +629,9 @@ function computeTargets(p) {
   const kcal = Math.max(p.sex === "f" ? 1400 : 1800, roundTo(bmr * 1.45 - 500, 50));
   return { kcal, protein: roundTo(p.goalKg * 1.9, 5), steps: 8000 };
 }
-const unitLabel = e => e.unit === "s" ? "s" : e.unit === "reps" ? (e.side ? "reps/side" : "reps") : "kg";
+const WU = () => (P() && P().unit === "lb" ? "lb" : "kg");
+const incFor = e => WU() === "lb" ? ({ 1: 2.5, 2: 5, 2.5: 5, 5: 10 }[e.inc] || e.inc * 2) : e.inc;
+const unitLabel = e => e.unit === "s" ? "s" : e.unit === "reps" ? (e.side ? "reps/side" : "reps") : WU();
 const rangeStr = (e, lo, hi) => e.unit === "s" ? `${lo}–${hi} s` : `${lo}–${hi}${e.side ? "/side" : ""}`;
 
 function doneWorkouts() { return Object.values(S.workouts).filter(w => w && w.status === "done").sort((a, b) => (a.date + (a.startedAt || 0)).localeCompare(b.date + (b.startedAt || 0))); }
@@ -642,12 +667,13 @@ function suggest(item) {
   const missed = x => x.sets.some(s => s.reps < lo);
   let next = kg, note, up = false;
   const wayOver = allTop && last.sets.every(s => s.reps >= hi + 3);
-  if (wayOver) { next = kg + 2 * e.inc; up = true; note = `Too light: ${hi + 3}+ reps on every set. Go up to ${kgStr(next)} kg.`; }
-  else if (allTop) { next = kg + e.inc; up = true; note = `You hit ${hi} on every set. Go up to ${kgStr(next)} kg.`; }
+  const inc = incFor(e), u = WU();
+  if (wayOver) { next = kg + 2 * inc; up = true; note = `Too light: ${hi + 3}+ reps on every set. Go up to ${kgStr(next)} ${u}, or the closest weight the machine has.`; }
+  else if (allTop) { next = kg + inc; up = true; note = `You hit ${hi} on every set. Go up to ${kgStr(next)} ${u}, or the next weight the machine has. Fewer reps at the new weight is normal.`; }
   else if (missed(last) && h[1] && missed(h[1]) && Math.max(...h[1].sets.map(s => s.kg || 0)) === kg) {
-    next = Math.max(0, roundTo(kg * 0.9, e.inc)); note = `Under ${lo} reps twice in a row. Drop to ${kgStr(next)} kg and build back up.`;
+    next = Math.max(0, roundTo(kg * 0.9, inc)); note = `Under ${lo} reps twice in a row. Drop to ${kgStr(next)} ${u} and build back up.`;
   } else note = `Same weight. Last time: ${last.sets.map(s => s.reps).join(", ")} reps. Beat one of those.`;
-  if (deloadOn()) { next = Math.max(0, roundTo(next * 0.85, e.inc)); up = false; note = `Easy week: ${kgStr(next)} kg and stop about 3 reps before it gets hard.`; }
+  if (deloadOn()) { next = Math.max(0, roundTo(next * 0.85, inc)); up = false; note = `Easy week: ${kgStr(next)} ${u} and stop about 3 reps before it gets hard.`; }
   return { kg: next, note, up };
 }
 
@@ -720,14 +746,14 @@ function previewHTML(doneToday) {
   const rows = items.map(it => {
     const e = EX[it.ex], sg = suggest(it);
     const right = e.unit === "kg"
-      ? (sg.kg != null ? `<span class="plate${sg.up ? " up" : ""}"><i></i>${kgStr(sg.kg)} kg</span>` : `<span class="plate none">find your weight</span>`)
+      ? (sg.kg != null ? `<span class="plate${sg.up ? " up" : ""}"><i></i>${kgStr(sg.kg)} ${WU()}</span>` : `<span class="plate none">find your weight</span>`)
       : `<span class="plate none">${sg.target ? sg.target + " " + unitLabel(e) : ""}</span>`;
     return `<li><span><button class="link" data-act="guide" data-ex="${it.ex}">${esc(e.name)}</button> <span class="muted small">${it.sets} × ${rangeStr(e, it.lo, it.hi)}</span></span>${right}${sg.up ? `<span class="sub good">${esc(sg.note)}</span>` : ""}</li>`;
   }).join("");
   const other = s === "A" ? "B" : "A";
   return `<div class="card">
     ${doneToday ? `<p class="muted">Nice work today. Rest tomorrow and get your steps in. Here's your next session.</p>` : ""}
-    <div class="between"><h2>Session ${s}</h2><span class="muted small">about ${introOn() ? 40 : 55} min</span></div>
+    <div class="between"><h2>Session ${s}</h2><span class="muted small">about ${sessionMinutes(items)} min</span></div>
     ${introOn() ? `<p class="pill blue">${doneWorkouts().length ? "One more intro workout" : "Intro workout 1 of 2"}: 2 sets each, light weights</p>
       <p class="small muted">The goal is to learn the machines and leave feeling good, not wrecked. Full sessions start from workout 3.</p>` : ""}
     ${deloadOn() ? `<p class="pill warn">Easy week until ${fmtDate(P().deloadUntil)}: fewer sets, lighter weights</p>` : ""}
@@ -742,7 +768,8 @@ function previewHTML(doneToday) {
 }
 const TICK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 function activeHTML(w) {
-  const firstKg = (w.items || []).findIndex(x => EX[x.ex] && EX[x.ex].unit === "kg");
+  const isKg = x => EX[x.ex] && EX[x.ex].unit === "kg";
+  const warmIdx = new Set([(w.items || []).findIndex(x => isKg(x) && EX[x.ex].area === "Legs"), (w.items || []).findIndex(x => isKg(x) && EX[x.ex].area !== "Legs")]);
   const items = (w.items || []).map((it, i) => {
     const e = EX[it.ex] || { name: it.ex, unit: "kg" }, sg = suggest(it);
     const nextJ = (it.sets || []).findIndex(x => !x.done);
@@ -756,18 +783,19 @@ function activeHTML(w) {
       const repsIn = `<input class="field" id="${rId}" data-draft inputmode="numeric" autocomplete="off" aria-label="Set ${j + 1} ${unitLabel(e)}" placeholder="${target}" value="${esc(dv(rId, s.reps ?? ""))}">`;
       if (e.unit === "kg") {
         return `<div class="set${s.done ? " done" : ""}"><span class="n">${j + 1}</span>
-          <input class="field" id="${kgId}" data-draft inputmode="decimal" autocomplete="off" aria-label="Set ${j + 1} weight in kg" placeholder="kg" value="${esc(dv(kgId, s.kg ?? ""))}">
-          <span class="u">kg ×</span>${repsIn}
+          <input class="field" id="${kgId}" data-draft inputmode="decimal" autocomplete="off" aria-label="Set ${j + 1} weight in ${WU()}" placeholder="${WU()}" value="${esc(dv(kgId, s.kg ?? ""))}">
+          <span class="u">${WU()} ×</span>${repsIn}
           <button class="tick" data-act="set" data-i="${i}" data-j="${j}" aria-label="${s.done ? "Undo" : "Finish"} set ${j + 1}" aria-pressed="${!!s.done}">${TICK}</button></div>`;
       }
       return `<div class="set one${s.done ? " done" : ""}"><span class="n">${j + 1}</span>${repsIn}<span class="u">${unitLabel(e)}</span>
         <button class="tick" data-act="set" data-i="${i}" data-j="${j}" aria-label="${s.done ? "Undo" : "Finish"} set ${j + 1}" aria-pressed="${!!s.done}">${TICK}</button></div>`;
     }).join("");
     return `<article class="ex">
-      <div class="ex-head"><div><h3>${esc(e.name)}</h3><p class="muted small">${it.sets.length} × ${rangeStr(e, it.lo, it.hi)}${e.perHand ? " · kg per dumbbell" : ""}</p></div>
+      <div class="ex-head"><div><h3>${esc(e.name)}</h3><p class="muted small">${it.sets.length} × ${rangeStr(e, it.lo, it.hi)}${e.perHand ? ` · ${WU()} per dumbbell` : ""}</p></div>
         <div class="ex-tools"><button class="btn ghost sm" data-act="guide" data-ex="${it.ex}">How to</button><button class="btn ghost sm" data-act="swap" data-i="${i}">Swap</button></div></div>
       <p class="hint${sg.up ? " up" : ""}">${esc(sg.note)}</p>
-      ${i === firstKg && !it.sets.some(x => x.done) ? `<p class="mine">Warm-up set first: 10 easy reps at about half your working weight. Don't log it.</p>` : ""}
+      ${warmIdx.has(i) && !it.sets.some(x => x.done) ? `<p class="mine">Warm-up set first: 10 easy reps at about half your working weight. Don't log it.</p>` : ""}
+      ${it.ex === "cable_curl" && w.items[i + 1] && w.items[i + 1].ex === "triceps_pushdown" ? `<p class="mine">Short on time? Alternate curl and pushdown sets at the same cable station, resting 60 s after each pair.</p>` : ""}
       ${mine ? `<p class="mine">Your settings: ${esc(mine)}</p>` : ""}
       <div class="sets">${sets}</div>${holdBtn}${breaks}
     </article>`;
@@ -915,7 +943,7 @@ function strengthHTML() {
     if (!h.length) return "";
     const val = x => e.unit === "kg" ? Math.max(...x.sets.map(s => s.kg || 0)) : Math.max(...x.sets.map(s => s.reps));
     const v = h.map(val), first = v[0], last = v[v.length - 1], d = last - first;
-    const u = e.unit === "kg" ? "kg" : unitLabel(e);
+    const u = unitLabel(e);
     let spark = "";
     if (v.length > 1) {
       const mn = Math.min(...v), mx = Math.max(...v), r = mx - mn || 1;
@@ -1005,8 +1033,8 @@ function checkinHTML() {
 /* Plan */
 const PHASE_INFO = {
   1: ["Phase 1", "Learn the machines", "Your first 12 workouts, about 4 weeks. Machines and cables only, so you can learn each movement safely and find your starting weights. 2–3 sets per exercise."],
-  2: ["Phase 2", "Add dumbbells", "Workouts 13–24. Goblet squat, dumbbell bench press, Romanian deadlift and dumbbell shoulder press join in. Most exercises go to 3 sets."],
-  3: ["Phase 3", "Build", "Workout 25 on. Same exercises as phase 2, with a third set on leg curls and arms. Keep adding weight whenever you reach the top of the rep range."],
+  2: ["Phase 2", "Add dumbbells", "Workouts 13–24. Goblet squat, dumbbell bench press, Romanian deadlift and dumbbell shoulder press join in, plus lateral raises for wider shoulders. Most exercises go to 3 sets."],
+  3: ["Phase 3", "Build", "Workout 25 on. Same exercises as phase 2, with a third set on arms. Keep adding weight whenever you reach the top of the rep range."],
 };
 const domId = k => k.replace(/[^a-z0-9]/gi, "-");
 function guideBody(id, scope) {
@@ -1028,18 +1056,19 @@ function planSessionHTML(ph, s) {
   const rows = programFor(ph, s).map((it, k) => {
     const e = EX[it.ex];
     let right = "";
-    if (cur && e.unit === "kg") { const sg = suggest(it); if (sg.kg != null) right = `<span class="plate"><i></i>${kgStr(sg.kg)} kg</span>`; }
+    if (cur && e.unit === "kg") { const sg = suggest(it); if (sg.kg != null) right = `<span class="plate"><i></i>${kgStr(sg.kg)} ${WU()}</span>`; }
     const sub = `${it.sets} × ${rangeStr(e, it.lo, it.hi)} · ${e.area}${it.ex !== it.slot ? ` · replaces ${esc(EX[it.slot].name)}` : ""}`;
     return guideRow(`p${ph}${s}${k}-${it.ex}`, it.ex, `${k + 1}. ${esc(e.name)}`, sub, right);
   }).join("");
-  return `<div class="card"><div class="between"><h2>Session ${s}</h2><span class="muted small">about 55 min</span></div>
+  return `<div class="card"><div class="between"><h2>Session ${s}</h2><span class="muted small">about ${sessionMinutes(programFor(ph, s))} min</span></div>
     <div>${guideRow(`p${ph}${s}w-bike`, "bike", "Warm-up", WARMUP)}${rows}${guideRow(`p${ph}${s}f-treadmill`, "treadmill", "Finisher: incline walk", FINISHER)}</div></div>`;
 }
 function rhythmHTML() {
   const wk = (label, days) => `<span class="wk">${label}</span>` + days.map(d => `<span class="rh${d ? " on" : ""}">${d || ""}</span>`).join("");
   return `<div class="rhythm"><span></span>${["M", "T", "W", "T", "F", "S", "S"].map(d => `<span class="h">${d}</span>`).join("")}
     ${wk("Week 1", ["A", "", "B", "", "A", "", ""])}${wk("Week 2", ["B", "", "A", "", "B", "", ""])}</div>
-    <p class="small muted">Any 3 days with a rest day in between works. Sessions alternate, so the Today tab always shows which one is next. On rest days, just hit your steps.</p>`;
+    <p class="small muted">Any 3 days with a rest day in between works. Sessions alternate, so the Today tab always shows which one is next.</p>
+    <p class="small muted"><b>Want to use the gym more?</b> On one or two rest days, an optional 30–40 min easy incline walk or bike burns extra calories without getting in the way of recovery. Otherwise just hit your steps.</p>`;
 }
 function renderMachines() {
   const el = $("#p-machines");
@@ -1102,7 +1131,7 @@ function coachContext() {
   const L = [];
   L.push(`TODAY: ${D} (${parseYmd(D).toLocaleDateString("en-GB", { weekday: "long" })}). Week ${weekNo()} since starting on ${p.startDate}. Workouts completed: ${doneWorkouts().length}. Phase ${ph}: ${PHASES[ph]}.${deloadOn() ? ` Easy week until ${p.deloadUntil}.` : ""}`);
   L.push(`PROFILE: ${p.sex === "f" ? "female" : "male"}, ${p.age} years, ${p.heightCm} cm, start ${p.startKg} kg, goal ${p.goalKg} kg. Total beginner.`);
-  L.push(`TARGETS: ${p.kcal} kcal/day, ${p.protein} g protein/day, ${p.steps} steps/day. Food tracking: ${p.foodMode === "count" ? "counting calories" : "habit checklist (not counting)"}.`);
+  L.push(`TARGETS: ${p.kcal} kcal/day, ${p.protein} g protein/day, ${p.steps} steps/day. Food tracking: ${p.foodMode === "count" ? "counting calories" : "habit checklist (not counting)"}. Lifting weights are logged in ${WU()}.`);
   const ws = weightSeries().slice(-21);
   L.push(`WEIGH-INS (kg): ${ws.length ? ws.map(w => `${w.date} ${w.kg}`).join(", ") : "none yet"}`);
   const a1 = avgEnding(D), a0 = avgEnding(addDays(D, -7));
@@ -1306,6 +1335,7 @@ const WHY = [
   ["Reps and effort", "8–15 reps, ending each set with about 2 good reps left. Light and heavy weights build similar muscle when the sets are hard, and going all the way to failure isn't needed."],
   ["Adding weight", "Hit the top of the rep range on every set and the weight goes up next time. Far too light (3+ reps over)? It jumps twice as far."],
   ["Arms", "Presses and rows already work your biceps and triceps. Adding curls and pushdowns gives a small extra boost to arm size, especially the triceps, for about 6 minutes a session."],
+  ["Shoulders", "Pressing mostly works the front of the shoulder. Lateral raises hit the side, which is what makes shoulders look wider, so they join from phase 2."],
   ["Rest", "90 seconds, 60 for arms and core. Resting over 60 s builds a little more muscle than shorter rests; past about 90 s studies find little extra. Still out of breath? Take longer. The timer keeps counting."],
   ["Machines first", "Machines and free weights build similar muscle. Strength carries over best to what you practise, so dumbbells join after your first 12 workouts, once you have the basics."],
   ["Walking after lifting", "Adding cardio barely dents muscle and strength gains. Easy incline walking after weights burns extra calories without hurting recovery."],
@@ -1349,7 +1379,7 @@ function dataTable(view) {
       const e = EX[it.ex];
       rows.push([w.date, w.session, e ? e.name : it.ex, j + 1, e && e.unit === "kg" ? x.kg : "", x.reps, e ? unitLabel(e) : "", x.rest ?? ""]);
     }));
-    return { head: ["Date", "Session", "Exercise", "Set", "kg", "Reps / sec", "Unit", "Break before (s)"], rows };
+    return { head: ["Date", "Session", "Exercise", "Set", `Weight (${WU()})`, "Reps / sec", "Unit", "Break before (s)"], rows };
   }
   if (view === "waist") return { head: ["Date", "Waist (cm)"], rows: byDate(S.waist).map(w => [w.date, w.cm]) };
   if (view === "habits") return {
@@ -1398,6 +1428,7 @@ function settingsHTML() {
     <label>Steps per day<input class="field" id="s-steps" inputmode="numeric" value="${p.steps}"></label>
     <label>Rest between sets (s)<input class="field" id="s-rest" inputmode="numeric" value="${p.rest || 90}"></label>
     <label>Training phase<select class="field" id="s-phase">${[["auto", "Automatic (by week)"], ["1", "1: Learn the machines"], ["2", "2: Add dumbbells"], ["3", "3: Build"]].map(([v, l]) => `<option value="${v}" ${String(p.phase || "auto") === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+    <label>Machine weights in<select class="field" id="s-unit"><option value="kg" ${WU() === "kg" ? "selected" : ""}>kg</option><option value="lb" ${WU() === "lb" ? "selected" : ""}>lb</option></select></label>
     <label>Food tracking<select class="field" id="s-food"><option value="checklist" ${p.foodMode !== "count" ? "selected" : ""}>Habit checklist</option><option value="count" ${p.foodMode === "count" ? "selected" : ""}>Count calories</option></select></label>
     <label class="full">Program start date<input class="field" id="s-date" type="date" value="${p.startDate}"></label>
     <div class="full row"><button class="btn">Save settings</button><button class="btn ghost" type="button" data-act="recalc">Recalculate targets</button></div>
@@ -1540,7 +1571,7 @@ document.addEventListener("submit", e => {
     const patch = {
       goalKg: round1(g("#s-goal") || p.goalKg), startKg: round1(g("#s-start-kg") || p.startKg), heightCm: Math.round(g("#s-h") || p.heightCm), age: Math.round(g("#s-age") || p.age),
       kcal: Math.round(g("#s-kcal") || p.kcal), protein: Math.round(g("#s-prot") || p.protein), steps: Math.round(g("#s-steps") || p.steps), rest: Math.max(30, Math.round(g("#s-rest") || 90)),
-      phase: $("#s-phase").value, foodMode: $("#s-food").value, startDate: $("#s-date").value || p.startDate,
+      phase: $("#s-phase").value, foodMode: $("#s-food").value, unit: $("#s-unit").value, startDate: $("#s-date").value || p.startDate,
     };
     const moved = patch.startKg !== p.startKg;
     if (moved) { patch.startPending = false; if (patch.kcal === p.kcal) patch.kcal = computeTargets({ ...p, ...patch }).kcal; }
