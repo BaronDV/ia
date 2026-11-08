@@ -1,4 +1,4 @@
-<title>First Rep Coach</title>
+<title>Baron's Fit Log</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -303,7 +303,7 @@ details.guide[open] summary .chev { transform: rotate(-135deg); }
 <header class="top">
   <div class="top-in">
     <div>
-      <div class="brand">First Rep Coach</div>
+      <div class="brand">Baron&#39;s Fit Log</div>
       <div class="brand-sub" id="hdr-sub">Gym log and coach</div>
     </div>
     <button class="icon-btn" id="btn-settings" data-act="settings" aria-label="Settings">
@@ -1325,7 +1325,7 @@ async function initSample() {
   if (S.tab === "food") render();
 }
 function coachRules() {
-  return `You are the coach inside First Rep Coach, a gym app for a complete beginner who trains 3 days a week at an Anytime Fitness club with a fat-loss goal.
+  return `You are the coach inside Baron's Fit Log, a gym, food and progress app for a complete beginner who trains 3 days a week at an Anytime Fitness club with a fat-loss goal.
 Be warm, direct and practical. Keep answers under 150 words unless asked for more. Plain text only: short paragraphs or a few "- " bullets, no headings, no tables, no markdown bold.
 Use the user's real data below and give concrete numbers (kg, reps, grams, steps, minutes).
 Training approach: full-body sessions A and B alternating, machines first (phase 1, the first 12 workouts), dumbbells from workout 13. The first 2 workouts are a light intro with 2 sets each. Double progression: add weight once every set reaches the top of the rep range. Sets end with about 2 good reps left (no training to failure). Rest 90 s between sets, 60 s for arms and core. The user prefers machines and cables over floor exercises.
@@ -1857,9 +1857,9 @@ document.addEventListener("click", e => {
   else if (act === "dl-csv") {
     const v = S.dataView || "weights", t = dataTable(v);
     const csv = [t.head, ...t.rows].map(r => r.map(csvCell).join(",")).join("\r\n");
-    download(`first-rep-coach-${(DATA_VIEWS.find(x => x[0] === v) || [v, v])[1].toLowerCase().replace(/\s+/g, "-")}-${today()}.csv`, csv);
+    download(`fit-log-${(DATA_VIEWS.find(x => x[0] === v) || [v, v])[1].toLowerCase().replace(/\s+/g, "-")}-${today()}.csv`, csv);
   }
-  else if (act === "dl-json") download(`first-rep-coach-backup-${today()}.json`, JSON.stringify({ exportedAt: new Date().toISOString(), ...Object.fromEntries(COLS.map(c => [c, c === "profile" ? S.profile : S[c]])) }, null, 2));
+  else if (act === "dl-json") download(`fit-log-backup-${today()}.json`, JSON.stringify({ exportedAt: new Date().toISOString(), ...Object.fromEntries(COLS.map(c => [c, c === "profile" ? S.profile : S[c]])) }, null, 2));
   else if (act === "vphase") { S.viewPhase = +b.dataset.v; render(); }
   else if (act === "area") { S.area = b.dataset.v; delete S.draft["m-q"]; render(); }
   else if (act === "sex") { S.draft.sex = b.dataset.v; render(); }

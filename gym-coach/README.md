@@ -1,6 +1,6 @@
-# First Rep Coach
+# Baron's Fit Log
 
-A phone-first gym log and coach for a beginner training 3 days a week with a fat-loss goal.
+A phone-first gym, food and progress log with a coach, for a beginner training 3 days a week with a fat-loss goal.
 
 Live app (private to the owner): https://claude.ai/artifact/U5dH3q4vRHjL5zwKszrTXv
 
