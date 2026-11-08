@@ -573,9 +573,10 @@ function weekNo(d = today()) { return Math.max(1, Math.floor(daysBetween(P().sta
 function phaseNo() {
   const ph = P().phase;
   if (ph && ph !== "auto") return Number(ph);
-  const w = weekNo();
-  return w <= 4 ? 1 : w <= 8 ? 2 : 3;
+  const n = doneWorkouts().length;
+  return n < 12 ? 1 : n < 24 ? 2 : 3;
 }
+function introOn() { return (!P() || !P().phase || P().phase === "auto") && doneWorkouts().length < 2; }
 function deloadOn() { return !!(P() && P().deloadUntil && today() <= P().deloadUntil); }
 function exFor(slot) { const sw = P() && P().swaps && P().swaps[slot]; return sw && EX[sw] ? sw : slot; }
 function programFor(ph, session) {
@@ -584,6 +585,7 @@ function programFor(ph, session) {
     if (e.unit !== EX[slot].unit && e.rng) [lo, hi] = e.rng;
     let n = ph >= 3 && EX[slot].area !== "Core" ? Math.max(sets, 3) : sets;
     if (deloadOn()) n = Math.max(1, n - 1);
+    if (introOn() && ph === 1) n = Math.min(n, 2);
     return { slot, ex, sets: n, lo, hi };
   });
 }
@@ -665,7 +667,7 @@ function render() {
     $(`.tab[data-tab="${t}"]`).setAttribute("aria-current", S.tab === t ? "page" : "false");
   }
   const ready = S.loaded.size >= COLS.length;
-  if (ready && P()) $("#hdr-sub").textContent = `Week ${weekNo()} · ${PHASES[phaseNo()]}${deloadOn() ? " · easy week" : ""}`;
+  if (ready && P()) { const nd = doneWorkouts().length; $("#hdr-sub").textContent = `Phase ${phaseNo()}: ${PHASES[phaseNo()]} · ${nd} workout${nd === 1 ? "" : "s"} done${deloadOn() ? " · easy week" : ""}`; }
   if (!ready) { $("#p-today").innerHTML = '<div class="skeleton">Loading your log…</div>'; return; }
   if (S.tab === "today") renderToday();
   else if (S.tab === "progress") renderProgress();
@@ -696,7 +698,7 @@ function renderToday() {
     return `<div class="day${weekDone.has(d) ? " on" : ""}${d === D ? " today" : ""}"><b>${parseYmd(d).getDate()}</b>${l}</div>`;
   }).join("");
   const n = doneWorkouts().filter(w => w.date >= mon).length;
-  const title = aw ? `Session ${aw.session} in progress` : doneToday ? "Workout done today" : `Session ${nextSession()} is next`;
+  const title = aw ? `Session ${aw.session} in progress` : doneToday ? "Workout done today" : !doneWorkouts().length ? "Your first workout" : `Session ${nextSession()} is next`;
   const head = `<div class="head"><div class="eyebrow">${esc(parseYmd(D).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }))}</div><h1>${title}</h1></div>
     <div class="card"><div class="between"><h3>This week</h3><span class="pill ${n >= 3 ? "good" : "blue"}">${n} of 3 workouts</span></div><div class="week">${days}</div></div>`;
   el.innerHTML = head + (aw ? activeHTML(aw) + weighHTML() + basicsHTML() : previewHTML(doneToday) + weighHTML() + basicsHTML());
@@ -713,7 +715,9 @@ function previewHTML(doneToday) {
   const other = s === "A" ? "B" : "A";
   return `<div class="card">
     ${doneToday ? `<p class="muted">Nice work today. Rest tomorrow and get your steps in. Here's your next session.</p>` : ""}
-    <div class="between"><h2>Session ${s}</h2><span class="muted small">about 55 min</span></div>
+    <div class="between"><h2>Session ${s}</h2><span class="muted small">about ${introOn() ? 40 : 55} min</span></div>
+    ${introOn() ? `<p class="pill blue">${doneWorkouts().length ? "One more intro workout" : "Intro workout 1 of 2"}: 2 sets each, light weights</p>
+      <p class="small muted">The goal is to learn the machines and leave feeling good, not wrecked. Full sessions start from workout 3.</p>` : ""}
     ${deloadOn() ? `<p class="pill warn">Easy week until ${fmtDate(P().deloadUntil)}: fewer sets, lighter weights</p>` : ""}
     <ul class="plan">
       <li><span>Warm-up</span><span class="muted small">5 min</span><span class="sub">${WARMUP}</span></li>
@@ -988,9 +992,9 @@ function checkinHTML() {
 
 /* Plan */
 const PHASE_INFO = {
-  1: ["Weeks 1–4", "Learn the machines", "Machines and cables only, so you can learn each movement safely and find your starting weights. 2–3 sets per exercise."],
-  2: ["Weeks 5–8", "Add dumbbells", "Goblet squat, dumbbell bench press, Romanian deadlift and dumbbell shoulder press join in. Most exercises go to 3 sets."],
-  3: ["Week 9 on", "Build", "Same exercises as phase 2, with a third set on leg curls and arms. Keep adding weight whenever you reach the top of the rep range."],
+  1: ["Phase 1", "Learn the machines", "Your first 12 workouts, about 4 weeks. Machines and cables only, so you can learn each movement safely and find your starting weights. 2–3 sets per exercise."],
+  2: ["Phase 2", "Add dumbbells", "Workouts 13–24. Goblet squat, dumbbell bench press, Romanian deadlift and dumbbell shoulder press join in. Most exercises go to 3 sets."],
+  3: ["Phase 3", "Build", "Workout 25 on. Same exercises as phase 2, with a third set on leg curls and arms. Keep adding weight whenever you reach the top of the rep range."],
 };
 const domId = k => k.replace(/[^a-z0-9]/gi, "-");
 function guideBody(id, scope) {
@@ -1076,7 +1080,7 @@ function coachRules() {
   return `You are the coach inside First Rep Coach, a gym app for a complete beginner who trains 3 days a week at an Anytime Fitness club with a fat-loss goal.
 Be warm, direct and practical. Keep answers under 150 words unless asked for more. Plain text only: short paragraphs or a few "- " bullets, no headings, no tables, no markdown bold.
 Use the user's real data below and give concrete numbers (kg, reps, grams, steps, minutes).
-Training approach: full-body sessions A and B alternating, machines first (phase 1), dumbbells from week 5. Double progression: add weight once every set reaches the top of the rep range. Sets end with about 2 good reps left (no training to failure). Rest 90 s between sets, 60 s for arms and core. The user prefers machines and cables over floor exercises.
+Training approach: full-body sessions A and B alternating, machines first (phase 1, the first 12 workouts), dumbbells from workout 13. The first 2 workouts are a light intro with 2 sets each. Double progression: add weight once every set reaches the top of the rep range. Sets end with about 2 good reps left (no training to failure). Rest 90 s between sets, 60 s for arms and core. The user prefers machines and cables over floor exercises.
 Nutrition approach: a moderate deficit, the protein target, simple habits. Never suggest under 1,800 kcal for a man or 1,400 for a woman, crash diets, fat burners or skipping meals.
 Safety: you are not a doctor. For sharp pain, joint pain that lingers, chest pain, dizziness or numbness, tell them to stop that exercise and see a doctor or physiotherapist, and offer a pain-free alternative.
 ${sampleTools ? "You can change the plan with your tools. Only do that when the user asks for a change or agrees to one you suggested, then say exactly what you changed." : "You cannot change the plan yourself. Tell the user which button to use: Swap on an exercise, or Settings for targets."}`;
@@ -1084,7 +1088,7 @@ ${sampleTools ? "You can change the plan with your tools. Only do that when the 
 function coachContext() {
   const p = P(), D = today(), ph = phaseNo();
   const L = [];
-  L.push(`TODAY: ${D} (${parseYmd(D).toLocaleDateString("en-GB", { weekday: "long" })}). Week ${weekNo()} since starting on ${p.startDate}. Phase ${ph}: ${PHASES[ph]}.${deloadOn() ? ` Easy week until ${p.deloadUntil}.` : ""}`);
+  L.push(`TODAY: ${D} (${parseYmd(D).toLocaleDateString("en-GB", { weekday: "long" })}). Week ${weekNo()} since starting on ${p.startDate}. Workouts completed: ${doneWorkouts().length}. Phase ${ph}: ${PHASES[ph]}.${deloadOn() ? ` Easy week until ${p.deloadUntil}.` : ""}`);
   L.push(`PROFILE: ${p.sex === "f" ? "female" : "male"}, ${p.age} years, ${p.heightCm} cm, start ${p.startKg} kg, goal ${p.goalKg} kg. Total beginner.`);
   L.push(`TARGETS: ${p.kcal} kcal/day, ${p.protein} g protein/day, ${p.steps} steps/day. Food tracking: ${p.foodMode === "count" ? "counting calories" : "habit checklist (not counting)"}.`);
   const ws = weightSeries().slice(-21);
@@ -1291,7 +1295,7 @@ const WHY = [
   ["Adding weight", "Hit the top of the rep range on every set and the weight goes up next time. Far too light (3+ reps over)? It jumps twice as far."],
   ["Arms", "Presses and rows already work your biceps and triceps. Adding curls and pushdowns gives a small extra boost to arm size, especially the triceps, for about 6 minutes a session."],
   ["Rest", "90 seconds, 60 for arms and core. Resting over 60 s builds a little more muscle than shorter rests; past about 90 s studies find little extra. Still out of breath? Take longer. The timer keeps counting."],
-  ["Machines first", "Machines and free weights build similar muscle. Strength carries over best to what you practise, so dumbbells join in week 5 once you have the basics."],
+  ["Machines first", "Machines and free weights build similar muscle. Strength carries over best to what you practise, so dumbbells join after your first 12 workouts, once you have the basics."],
   ["Walking after lifting", "Adding cardio barely dents muscle and strength gains. Easy incline walking after weights burns extra calories without hurting recovery."],
   ["Lifting while losing fat", "Lifting during a calorie deficit protects muscle, so more of the weight you lose comes from fat."],
   ["Tracking", "Weigh daily, judge the weekly average, change calories only after 2 slow weeks. In trials, daily weighing led to more weight loss than weighing less often."],
