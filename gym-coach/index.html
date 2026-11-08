@@ -22,6 +22,7 @@
   --good-soft: #DDF1E5;
   --warn: #AD6F12;
   --warn-soft: #FCE7C2;
+  --bad-soft: #FBD5D2;
   --bad: #C03A33;
   --scrim: rgba(18, 36, 26, .45);
   --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
@@ -32,14 +33,14 @@
   :root:not([data-theme="light"]) {
     --bg: #0C1410; --surface: #142019; --surface-2: #0C1410; --ink: #E5EEE8; --muted: #8FA397; --line: #223229;
     --accent: #5FD399; --accent-ink: #0C1410; --accent-soft: #16352A; --hero-bg: #1A6A45; --plate: #E3AA4E;
-    --good: #4CC983; --good-soft: #16352A; --warn: #E3AA4E; --warn-soft: #3A2A10; --bad: #F2716A; --scrim: rgba(0, 0, 0, .6);
+    --good: #4CC983; --good-soft: #16352A; --warn: #E3AA4E; --warn-soft: #3A2A10; --bad: #F2716A; --bad-soft: #3A1614; --scrim: rgba(0, 0, 0, .6);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0C1410; --surface: #142019; --surface-2: #0C1410; --ink: #E5EEE8; --muted: #8FA397; --line: #223229;
   --accent: #5FD399; --accent-ink: #0C1410; --accent-soft: #16352A; --hero-bg: #1A6A45; --plate: #E3AA4E;
-  --good: #4CC983; --good-soft: #16352A; --warn: #E3AA4E; --warn-soft: #3A2A10; --bad: #F2716A; --scrim: rgba(0, 0, 0, .6);
+  --good: #4CC983; --good-soft: #16352A; --warn: #E3AA4E; --warn-soft: #3A2A10; --bad: #F2716A; --bad-soft: #3A1614; --scrim: rgba(0, 0, 0, .6);
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -121,6 +122,7 @@ select.field { appearance: auto; }
 .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
 .pill.good { background: var(--good-soft); color: var(--good); }
 .pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
 .pill.blue { background: var(--accent-soft); color: var(--accent); }
 
 /* A weight-stack plate with its pin hole: the target load for a lift. */
@@ -259,6 +261,18 @@ details.guide[open] summary .chev { transform: rotate(-135deg); }
 .food-item .amt { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .del { font: inherit; font-size: 13px; font-weight: 600; border: 0; background: transparent; color: var(--muted); padding: 6px 8px; border-radius: 8px; cursor: pointer; min-width: 36px; }
 .del.armed { background: var(--bad); color: var(--on-hero); }
+.ebar { position: relative; }
+.ebar .mk { position: absolute; top: -4px; height: 18px; transform: translateX(-1px); border-left: 2px solid var(--on-hero); }
+.ebar .mk.dash { border-left-style: dotted; }
+.mk-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: rgba(255, 255, 255, .85); }
+.mk-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.mk-legend i { height: 12px; border-left: 2px solid var(--on-hero); }
+.mk-legend i.dash { border-left-style: dotted; }
+.ask p { margin: 0; }
+.lighter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 12px; border-radius: 10px; background: var(--surface); border: 1.5px solid var(--line); font-size: 14px; }
+.lighter > span { flex: 1; min-width: 180px; }
+.chart .maint { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 2 3; }
+.chart .maint-t { fill: var(--muted); font-weight: 600; }
 .chart .kbar { fill: var(--accent); }
 .chart.has-sel .kbar:not(.sel) { opacity: .4; }
 .chart .khit { fill: transparent; cursor: pointer; }
@@ -905,6 +919,34 @@ function foodAvg(end, days) {
   const v = Array.from({ length: days }, (_, i) => foodTotals(addDays(end, -i))).filter(t => t.n);
   return v.length ? { kcal: Math.round(mean(v.map(t => t.kcal))), protein: Math.round(mean(v.map(t => t.protein))), n: v.length } : null;
 }
+function tdeeFormula() {
+  const p = P(), kg = currentWeight() || p.startKg;
+  return roundTo((10 * kg + 6.25 * p.heightCm - 5 * p.age + (p.sex === "f" ? -161 : 5)) * 1.45, 10);
+}
+function tdee() {
+  const formula = tdeeFormula(), D = today();
+  const logged = Array.from({ length: 28 }, (_, i) => foodTotals(addDays(D, -i - 1))).filter(t => t.n && t.kcal >= 800);
+  const slope = slopePerDay();
+  if (logged.length >= 10 && slope != null) {
+    const intake = mean(logged.map(t => t.kcal)), est = roundTo(intake - slope * 7700, 10);
+    if (est >= formula * 0.75 && est <= formula * 1.3) return { kcal: est, src: "data", formula, intake: Math.round(intake), days: logged.length, perWeek: slope * 7 };
+  }
+  return { kcal: formula, src: "formula", formula };
+}
+function balanceState(diff) { return diff <= -200 ? "deficit" : diff >= 200 ? "surplus" : "even"; }
+const STATE_PILL = { deficit: ["good", "In a deficit"], even: ["warn", "Around maintenance"], surplus: ["bad", "In a surplus"] };
+function reserveFor(meal, D) {
+  if (D !== today()) return { kcal: 0, label: "" };
+  const order = ["breakfast", "lunch", "dinner"], h = new Date().getHours();
+  let later = meal === "snack" ? order.filter(m => (m === "lunch" ? h < 14 : m === "dinner" ? h < 21 : false)) : order.slice(order.indexOf(meal) + 1);
+  later = later.filter(m => !foodDay(D).some(x => x.meal === m));
+  return { kcal: later.length * roundTo(P().kcal * 0.25, 50), label: later.map(m => mealName(m).toLowerCase()).join(" and ") };
+}
+function verdictFor(kcal) {
+  const p = P(), D = S.foodDay || today(), burn = tdee().kcal, res = reserveFor(S.meal, D);
+  const after = foodTotals(D).kcal + kcal, end = after + res.kcal;
+  return { v: end <= p.kcal ? "go" : end <= burn ? "tweak" : "skip", after, end, res, burn };
+}
 const foodKey = n => n.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
 function foodLib() { return (S.foodlib.me && S.foodlib.me.items) || {}; }
 function addFoods(date, items) {
@@ -938,25 +980,32 @@ function syncEst() {
   });
   Object.keys(S.draft).filter(k => /^e-[nkp]-/.test(k)).forEach(k => delete S.draft[k]);
 }
-async function estimateFood() {
+async function estimateFood(mode) {
   const text = ($("#f-desc") ? $("#f-desc").value : "").trim().slice(0, 1500), photo = S.foodPhoto;
-  if (!text && !photo) { toast("Describe what you ate or add a photo first"); return; }
+  if (!text && !photo) { toast(mode === "ask" ? "Type or snap what you're thinking of eating" : "Describe what you ate or add a photo first"); return; }
   if (!sampleFn) { toast("Estimates work when this page is open in Claude. Enter calories yourself below."); return; }
-  S.estBusy = true; S.est = null; render();
-  const prompt = `Estimate the calories and protein in a meal. The eater is a 23-year-old man in the Philippines tracking food for fat loss, so Filipino dishes, carinderia servings and local fast food are common.
-Reply with only JSON in this shape: {"items":[{"name":"Garlic rice","qty":"1 cup","kcal":250,"protein":5}],"note":"one short sentence"}
-Rules: one item per distinct food or drink. kcal is a whole number rounded to the nearest 5; protein is whole grams. When the amount isn't given, assume a typical serving and put the amount you assumed in qty (e.g. "1 cup", "2 pieces", "1 serving"). Count cooking oil, sauces, rice and sugary drinks. In note, name the biggest uncertainty in plain words (portion size, frying oil, a guessed item), or leave it empty.${photo ? "\nA photo of the meal is attached." : ""}${text ? `\nWhat they wrote: ${text}` : ""}`;
+  S.estBusy = mode; S.est = null; render();
+  const p = P(), t = foodTotals(S.foodDay || today());
+  const prompt = `Estimate the calories and protein in some food. The person is a 23-year-old man in the Philippines tracking food for fat loss, so Filipino dishes, carinderia servings and local fast food are common.
+Reply with only JSON in this shape: {"items":[{"name":"Garlic rice","qty":"1 cup","kcal":250,"protein":5}],"lighter":{"name":"Plain rice, half cup","kcal":105,"protein":2},"note":"one short sentence"}
+Rules: one item per distinct food or drink. kcal is a whole number rounded to the nearest 5; protein is whole grams. When the amount isn't given, assume a typical serving and put the amount you assumed in qty (e.g. "1 cup", "2 pieces", "1 serving"). Count cooking oil, sauces, rice and sugary drinks.
+"lighter" is one realistic lighter way to have the same thing (smaller portion, skip or swap a side, a zero-sugar drink) with its total kcal and protein, or null if it is already a light choice.
+"note" is one short practical sentence in plain words: the biggest uncertainty in the estimate, or a useful tip about this food for someone losing fat (protein, oil, sugar, portion). No moralising.
+So far today they have eaten ${t.kcal} of ${p.kcal} kcal and ${t.protein} of ${p.protein} g protein.${photo ? "\nA photo of the food is attached." : ""}${text ? `\nWhat they wrote: ${text}` : ""}`;
   try {
     const opts = { modelTier: photo ? "default" : "quick" };
     if (photo) opts.images = [photo];
     const r = await sampleFn.json(prompt, opts);
-    const items = (r && Array.isArray(r.items) ? r.items : []).slice(0, 15).map(x => ({
-      name: (String(x && x.name || "").trim().slice(0, 60) || "Food") + (x && x.qty ? ` (${String(x.qty).trim().slice(0, 30)})` : ""),
+    const clean = x => ({
       kcal: Math.max(0, Math.min(3000, Math.round(Number(x && x.kcal) || 0))),
       protein: Math.max(0, Math.min(300, Math.round(Number(x && x.protein) || 0))),
+    });
+    const items = (r && Array.isArray(r.items) ? r.items : []).slice(0, 15).map(x => ({
+      name: (String(x && x.name || "").trim().slice(0, 60) || "Food") + (x && x.qty ? ` (${String(x.qty).trim().slice(0, 30)})` : ""), ...clean(x),
     }));
+    const lighter = r && r.lighter && r.lighter.name ? { name: String(r.lighter.name).trim().slice(0, 80), ...clean(r.lighter) } : null;
     if (!items.length) toast("Couldn't find any food in that. Try describing it differently.");
-    else S.est = { items, note: String((r && r.note) || "").slice(0, 240) };
+    else S.est = { mode, items, lighter, note: String((r && r.note) || "").slice(0, 240) };
   } catch (e) {
     const code = e && e.code;
     if (HIDE_CODES.includes(code)) { S.estOff = true; toast(SAMPLE_ERR[code] || "Estimates aren't available here. Enter calories yourself below."); }
@@ -964,6 +1013,28 @@ Rules: one item per distinct food or drink. kcal is a whole number rounded to th
     else if (code === "image_rejected") toast("That photo couldn't be read. Try another one.");
     else if (code !== "cancelled") toast(SAMPLE_ERR[code] || "Couldn't get an estimate. Try again, or enter it yourself below.");
   } finally { S.estBusy = false; render(); }
+}
+function askHTML() {
+  const p = P(), e = S.est, kcal = e.items.reduce((a, x) => a + x.kcal, 0), protein = e.items.reduce((a, x) => a + x.protein, 0);
+  const r = verdictFor(kcal);
+  const [cls, label] = { go: ["good", "Go ahead"], tweak: ["warn", "Okay, with a tweak"], skip: ["bad", "Better swap or skip"] }[r.v];
+  const later = r.res.kcal ? `, and about ${thousands(r.end)} after ${r.res.label}` : "";
+  const why = r.v === "go"
+    ? `You'd be at ${thousands(r.after)} of your ${thousands(p.kcal)} target${r.res.kcal ? `, still leaving about ${thousands(r.res.kcal)} for ${r.res.label}` : ""}. You stay in your planned deficit today.`
+    : r.v === "tweak"
+      ? `You'd be at ${thousands(r.after)}${later}. That's over your ${thousands(p.kcal)} target but under your ~${thousands(r.burn)} maintenance, so still a smaller deficit.`
+      : `You'd be at ${thousands(r.after)}${later}. That's above your ~${thousands(r.burn)} maintenance: a surplus for today.`;
+  let lighter = "";
+  if (e.lighter && e.lighter.kcal < kcal) {
+    const lv = verdictFor(e.lighter.kcal).v, [lc, ll] = { go: ["good", "fits"], tweak: ["warn", "tight"], skip: ["bad", "still over"] }[lv];
+    lighter = `<div class="lighter"><span><b>Lighter:</b> ${esc(e.lighter.name)} · ${thousands(e.lighter.kcal)} kcal <span class="pill ${lc}">${ll}</span></span><button class="btn ghost sm" data-act="ask-lighter">Have this instead</button></div>`;
+  }
+  return `<div class="est ask"><div class="between"><span class="pill ${cls}">${label}</span><span class="small muted num">+${thousands(kcal)} kcal · ${protein} g protein</span></div>
+    <p>${why}</p>
+    <p class="small muted">${e.items.map(x => `${esc(x.name)} ${thousands(x.kcal)}`).join(" · ")}</p>
+    ${lighter}
+    ${e.note ? `<p class="small muted">${esc(e.note)}</p>` : ""}
+    <div class="row"><button class="btn" data-act="ask-have">I'll have it · log to ${mealName(S.meal)}</button><button class="btn ghost" data-act="est-clear">Not now</button></div></div>`;
 }
 function estHTML() {
   const total = S.est.items.reduce((a, x) => a + x.kcal, 0);
@@ -984,17 +1055,19 @@ function recentHTML() {
   return `<div class="head"><div class="eyebrow">Tap to add again</div><div class="chips">${keys.map(k => `<button class="chip" data-act="food-quick" data-k="${esc(k)}">${esc(lib[k].name)}<span class="n">${thousands(lib[k].kcal)}</span></button>`).join("")}</div></div>`;
 }
 function foodChart() {
-  const p = P(), D = today(), days = Array.from({ length: 7 }, (_, i) => addDays(D, i - 6));
+  const p = P(), D = today(), days = Array.from({ length: 7 }, (_, i) => addDays(D, i - 6)), burn = tdee().kcal;
   const vals = days.map(d => ({ d, ...foodTotals(d) }));
   const logged = vals.filter(v => v.n);
-  if (!logged.length) return `<p class="muted small">Log a few days and each day shows here against your target.</p>`;
-  const W = 360, H = 160, L = 40, R = 44, T = 12, B = 24;
-  const step = p.kcal * 1.25 > 3000 ? 1000 : 500;
-  const ymax = Math.ceil(Math.max(p.kcal * 1.15, ...vals.map(v => v.kcal)) / step) * step;
+  if (!logged.length) return `<p class="muted small">Log a few days and each day shows here against your target and maintenance.</p>`;
+  const W = 360, H = 160, L = 40, R = 48, T = 12, B = 24;
+  const step = burn * 1.2 > 3000 ? 1000 : 500;
+  const ymax = Math.ceil(Math.max(burn * 1.1, ...vals.map(v => v.kcal)) / step) * step;
   const Y = v => T + (1 - v / ymax) * (H - T - B), band = (W - L - R) / 7, bw = Math.min(24, band * 0.55);
   let g = "";
   for (let v = 0; v <= ymax; v += step) g += `<line class="grid" x1="${L}" x2="${W - R}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text x="${L - 6}" y="${(Y(v) + 3.5).toFixed(1)}" text-anchor="end">${thousands(v)}</text>`;
-  g += `<line class="target" x1="${L}" x2="${W - R}" y1="${Y(p.kcal).toFixed(1)}" y2="${Y(p.kcal).toFixed(1)}"/><text class="target-t" x="${W - R + 4}" y="${(Y(p.kcal) + 3.5).toFixed(1)}">Target</text>`;
+  const yt = Y(p.kcal), ym = Y(burn), apart = Math.max(0, 11 - (yt - ym)) / 2;
+  g += `<line class="maint" x1="${L}" x2="${W - R}" y1="${ym.toFixed(1)}" y2="${ym.toFixed(1)}"/><text class="maint-t" x="${W - R + 4}" y="${(ym + 3.5 - apart).toFixed(1)}">Maint.</text>`;
+  g += `<line class="target" x1="${L}" x2="${W - R}" y1="${yt.toFixed(1)}" y2="${yt.toFixed(1)}"/><text class="target-t" x="${W - R + 4}" y="${(yt + 3.5 + apart).toFixed(1)}">Target</text>`;
   vals.forEach((v, i) => {
     const cx = L + i * band + band / 2, x = cx - bw / 2, base = Y(0);
     if (v.n && v.kcal > 0) {
@@ -1006,19 +1079,44 @@ function foodChart() {
     g += `<rect class="khit" data-act="kday" data-d="${v.d}" x="${(L + i * band).toFixed(1)}" y="${T}" width="${band.toFixed(1)}" height="${H - T - B}"><title>${fmtDate(v.d, { weekday: "short", day: "numeric", month: "short" })}: ${v.n ? `${thousands(v.kcal)} kcal, ${v.protein} g protein` : "nothing logged"}</title></rect>`;
   });
   const sel = S.kday && vals.find(v => v.d === S.kday);
-  const avg = { kcal: Math.round(mean(logged.map(v => v.kcal))), protein: Math.round(mean(logged.map(v => v.protein))) };
+  const vsBurn = k => { const d = k - burn; return Math.abs(d) < 200 ? "about maintenance" : d < 0 ? `${thousands(-d)} under maintenance` : `${thousands(d)} over maintenance`; };
   const read = sel
-    ? (sel.n ? `<b>${fmtDate(sel.d, { weekday: "short", day: "numeric", month: "short" })}:</b> ${thousands(sel.kcal)} kcal · ${sel.protein} g protein · ${sel.kcal <= p.kcal ? `${thousands(p.kcal - sel.kcal)} under` : `${thousands(sel.kcal - p.kcal)} over`} target`
+    ? (sel.n ? `<b>${fmtDate(sel.d, { weekday: "short", day: "numeric", month: "short" })}:</b> ${thousands(sel.kcal)} kcal · ${vsBurn(sel.kcal)} · ${sel.protein} g protein${sel.d === D ? " (so far)" : ""}`
       : `<b>${fmtDate(sel.d, { weekday: "short", day: "numeric", month: "short" })}:</b> nothing logged`)
-    : `<b>Average</b> on the ${logged.length} day${logged.length === 1 ? "" : "s"} you logged: ${thousands(avg.kcal)} kcal · ${avg.protein} g protein. Tap a day for its numbers.`;
-  return `<svg class="chart${sel ? " has-sel" : ""}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Calories eaten on each of the last 7 days, against your ${thousands(p.kcal)} kcal target">${g}</svg><p class="small muted">${read}</p>`;
+    : `Tap a day for its numbers.`;
+  return `<svg class="chart${sel ? " has-sel" : ""}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Calories eaten on each of the last 7 days, against your ${thousands(p.kcal)} kcal target and ${thousands(burn)} kcal maintenance">${g}</svg>
+    <div class="legend"><span><i style="border-top:2px dashed var(--plate);height:0;border-radius:0"></i>target</span><span><i style="border-top:2px dotted var(--muted);height:0;border-radius:0"></i>maintenance</span></div>
+    <p class="small muted">${read}</p>`;
+}
+function deficitHTML() {
+  const p = P(), td = tdee(), avg = foodAvg(addDays(today(), -1), 7);
+  let pill = "", summary;
+  if (!avg) summary = `Log a few full days and this shows whether you're in a deficit, at maintenance or over. Today doesn't count until it's over.`;
+  else {
+    const diff = avg.kcal - td.kcal, st = balanceState(diff);
+    pill = `<span class="pill ${STATE_PILL[st][0]}">${STATE_PILL[st][1]}</span>`;
+    const kgwk = round1(-diff * 7 / 7700);
+    summary = `Over the last 7 days you averaged <b>${thousands(avg.kcal)} kcal</b> on the ${avg.n} day${avg.n === 1 ? "" : "s"} you logged. Your maintenance is about <b>${thousands(td.kcal)}</b>, so you're ` +
+      (st === "deficit" ? `about ${thousands(-diff)} under: roughly <b>${fmt1(kgwk)} kg</b> of fat a week.`
+        : st === "surplus" ? `about ${thousands(diff)} over. That's a surplus, so your weight will creep up.`
+          : `right around it, so your weight should hold steady.`);
+  }
+  const how = td.src === "data"
+    ? `Worked out from your last 4 weeks: you averaged ${thousands(td.intake)} kcal on ${td.days} logged days while your weight trend moved ${td.perWeek <= 0 ? "down" : "up"} ${fmt1(Math.abs(td.perWeek))} kg a week. That means you burn about ${thousands(td.kcal)} a day. The formula's guess was ${thousands(td.formula)}.`
+    : `Maintenance, or TDEE, is what your body burns in a day: about ${thousands(td.kcal)} kcal from your weight, height, age and activity. Your ${thousands(p.kcal)} target is set about 500 below it. Once you've logged food on 10+ days and weighed in for 2+ weeks, the app works it out from your own numbers (what you ate versus how your weight moved), which is usually more accurate.`;
+  return `<div class="card"><div class="between"><h2>Deficit check</h2>${pill}</div>
+    <p class="small">${summary}</p>
+    ${foodChart()}
+    <details class="guide" data-key="tdee-how" ${S.openGuides.has("tdee-how") ? "open" : ""}><summary><span class="small"><b>How maintenance is estimated</b> <span class="muted">· ${td.src === "data" ? "from your logs" : "formula for now"}</span></span><span class="chev"></span></summary><div class="guide-body"><p class="small muted">${how}</p></div></details></div>`;
 }
 function renderFood() {
   const el = $("#p-food");
   if (needProfile(el)) return;
   const p = P(), D = S.foodDay && S.foodDay <= today() ? S.foodDay : today(), isToday = D === today(), t = foodTotals(D);
   if (!S.meal) S.meal = mealNow();
-  const left = p.kcal - t.kcal, avg = foodAvg(addDays(today(), -1), 7);
+  const left = p.kcal - t.kcal, burn = tdee().kcal, bal = t.kcal - burn;
+  const max = Math.max(burn * 1.12, t.kcal * 1.04), pc = v => Math.min(100, v / max * 100).toFixed(1);
+  const balLabel = Math.abs(bal) < 150 ? "about even" : bal < 0 ? (isToday ? "deficit so far" : "deficit") : "surplus";
   const canEst = sampleState === "ok" && !S.estOff;
   const meals = MEALS.map(([m, label]) => {
     const its = foodDay(D).filter(x => (x.meal || "snack") === m);
@@ -1031,19 +1129,22 @@ function renderFood() {
   el.innerHTML = `<div class="card hero">
       <div class="between"><span class="small" style="font-weight:600">${isToday ? "Today" : esc(fmtDate(D, { weekday: "long", day: "numeric", month: "short" }))}</span>
         <span class="row"><button class="day-nav" data-act="fday" data-v="-1" aria-label="Previous day">‹</button><button class="day-nav" data-act="fday" data-v="1" aria-label="Next day" ${isToday ? "disabled" : ""}>›</button></span></div>
-      <div><div class="big">${left >= 0 ? thousands(left) : "+" + thousands(-left)}</div><div class="small muted">${left >= 0 ? `calories left of ${thousands(p.kcal)}` : `calories over your ${thousands(p.kcal)} target`}</div></div>
-      <div class="track"><div class="fill" style="width:${Math.min(100, t.kcal / p.kcal * 100).toFixed(1)}%"></div></div>
-      <div class="hero-stats"><div><b>${thousands(t.kcal)}</b><span>eaten</span></div><div><b>${t.protein} / ${p.protein} g</b><span>protein</span></div><div><b>${avg ? thousands(avg.kcal) : "–"}</b><span>7-day average</span></div></div>
+      <div><div class="big">${left >= 0 ? thousands(left) : "+" + thousands(-left)}</div><div class="small muted">${left >= 0 ? `calories left of your ${thousands(p.kcal)} target` : `calories over your ${thousands(p.kcal)} target`}</div></div>
+      <div class="ebar"><div class="track"><div class="fill" style="width:${pc(t.kcal)}%"></div></div><i class="mk" style="left:${pc(p.kcal)}%"></i><i class="mk dash" style="left:${pc(burn)}%"></i></div>
+      <div class="mk-legend"><span><i></i>Target ${thousands(p.kcal)}</span><span><i class="dash"></i>Maintenance ~${thousands(burn)}</span></div>
+      <div class="hero-stats"><div><b>${thousands(t.kcal)}</b><span>eaten</span></div><div><b>${t.protein} / ${p.protein} g</b><span>protein</span></div><div><b>${bal < 0 ? "−" : "+"}${thousands(Math.abs(bal))}</b><span>${balLabel}</span></div></div>
     </div>
     <div class="card">
-      <div class="between"><h2>Add food</h2><span class="small muted">${isToday ? "" : "to " + esc(fmtDate(D))}</span></div>
+      <div class="between"><h2>What are you eating?</h2><span class="small muted">${isToday ? "" : "for " + esc(fmtDate(D))}</span></div>
       <div class="chips" role="group" aria-label="Meal">${MEALS.map(([k, l]) => `<button class="chip" data-act="meal" data-v="${k}" aria-pressed="${S.meal === k}">${l}</button>`).join("")}</div>
-      ${canEst ? `<textarea class="field" id="f-desc" data-draft rows="2" aria-label="What did you eat?" placeholder="What did you eat? e.g. 1 cup rice, chicken adobo, fried egg, Coke Zero">${esc(dv("f-desc"))}</textarea>
+      ${canEst ? `<textarea class="field" id="f-desc" data-draft rows="3" aria-label="What are you eating?" placeholder="e.g. 1 cup rice, chicken adobo, fried egg. Or ask: Chickenjoy with rice and a Coke?">${esc(dv("f-desc"))}</textarea>
         ${S.photoUrl ? `<div class="photo"><img src="${S.photoUrl}" alt="Your meal photo"><button class="btn danger sm" data-act="photo-clear">Remove photo</button></div>` : ""}
-        <div class="row"><button class="btn" data-act="estimate" ${S.estBusy ? "disabled" : ""}>${S.estBusy ? "Estimating…" : "Estimate calories"}</button>
-          ${sampleImages ? `<label class="btn ghost" for="f-photo">${S.photoUrl ? "Change photo" : "Add photo"}</label><input type="file" id="f-photo" accept="image/*" capture="environment" hidden>` : ""}</div>`
+        <div class="row"><button class="btn" data-act="estimate" ${S.estBusy ? "disabled" : ""}>${S.estBusy === "log" ? "Estimating…" : "Log it"}</button>
+          <button class="btn ghost" data-act="ask" ${S.estBusy ? "disabled" : ""}>${S.estBusy === "ask" ? "Checking…" : "Can I eat this?"}</button>
+          ${sampleImages ? `<label class="btn ghost" for="f-photo">${S.photoUrl ? "Change photo" : "Add photo"}</label><input type="file" id="f-photo" accept="image/*" capture="environment" hidden>` : ""}</div>
+        <p class="small muted"><b>Log it</b> when you've eaten. <b>Can I eat this?</b> shows where your day would end up first.</p>`
       : `<p class="small muted">${sampleState === "pending" ? "Connecting to Claude for calorie estimates…" : "Calorie estimates work when this page is open in Claude. You can still enter calories yourself below."}</p>`}
-      ${S.est ? estHTML() : ""}
+      ${S.est ? (S.est.mode === "ask" ? askHTML() : estHTML()) : ""}
       ${recentHTML()}
       <details class="guide" data-key="food-manual" ${S.openGuides.has("food-manual") ? "open" : ""}><summary><span class="small"><b>Enter calories yourself</b></span><span class="chev"></span></summary>
         <form class="form" data-form="food-manual"><label class="full">Food<input class="field" id="fm-name" data-draft placeholder="e.g. Chicken sandwich" value="${esc(dv("fm-name"))}"></label>
@@ -1053,7 +1154,7 @@ function renderFood() {
     </div>
     <div class="card"><div class="between"><h2>${isToday ? "Today's food" : "Food on " + esc(fmtDate(D))}</h2><span class="small muted num">${thousands(t.kcal)} kcal · ${t.protein} g protein</span></div>
       ${t.n ? `<div>${meals}</div>` : `<p class="muted small">Nothing logged ${isToday ? "yet today" : "on this day"}. Describe a meal above and check the estimate.</p>`}</div>
-    <div class="card"><div class="between"><h2>Last 7 days</h2><span class="small muted">target ${thousands(p.kcal)} kcal</span></div>${foodChart()}</div>
+    ${deficitHTML()}
     <div class="card quiet"><h3>Getting good numbers</h3><ul class="small muted">
       <li>Log as you eat, not at night. Small things like a sauce, a drink or a second cup of rice are what get forgotten.</li>
       <li>Rice is the big one: for a week or two, measure it with a cup once so your eye learns the portion.</li>
@@ -1357,6 +1458,8 @@ function coachContext() {
   if (aw) L.push(`CURRENT WORKOUT: ${wline(aw)}`);
   const last7 = Array.from({ length: 7 }, (_, i) => addDays(D, -i));
   const fdays = Array.from({ length: 7 }, (_, i) => addDays(D, -i)).filter(d => foodTotals(d).n);
+  const td = tdee();
+  L.push(`ENERGY: estimated maintenance (TDEE) about ${td.kcal} kcal/day (${td.src === "data" ? `from ${td.days} logged days and the weight trend` : "formula estimate"}); target ${p.kcal} kcal.`);
   L.push(`FOOD LOG, last 7 days: ${fdays.length ? fdays.map(d => { const t = foodTotals(d); return `${d} ${t.kcal} kcal/${t.protein} g protein`; }).join(", ") : "nothing logged"}`);
   L.push(`DAILY BASICS, last 7 days: ${HABITS.map(([k, l]) => `${l} ${last7.filter(d => S.habits[d] && S.habits[d][k]).length}/7`).join("; ")}`);
   const cis = Object.values(S.checkins).filter(Boolean).sort((a, b) => a.date.localeCompare(b.date)).slice(-3);
@@ -1831,7 +1934,10 @@ document.addEventListener("click", e => {
   else if (act === "range") { S.range = +b.dataset.v; render(); }
   else if (act === "fday") { const base = S.foodDay || today(), d = addDays(base, +b.dataset.v); S.foodDay = d > today() ? today() : d; render(); }
   else if (act === "meal") { S.meal = b.dataset.v; render(); }
-  else if (act === "estimate") estimateFood();
+  else if (act === "estimate") estimateFood("log");
+  else if (act === "ask") estimateFood("ask");
+  else if (act === "ask-have") { S.est.mode = "log"; render(); }
+  else if (act === "ask-lighter") { S.est = { mode: "log", items: [S.est.lighter], lighter: null, note: "" }; render(); }
   else if (act === "photo-clear") { clearPhoto(); render(); }
   else if (act === "est-del") { syncEst(); S.est.items.splice(+b.dataset.k, 1); if (!S.est.items.length) S.est = null; render(); }
   else if (act === "est-clear") { syncEst(); S.est = null; render(); }
