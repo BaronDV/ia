@@ -1138,10 +1138,12 @@ function renderFood() {
       <div class="between"><h2>What are you eating?</h2><span class="small muted">${isToday ? "" : "for " + esc(fmtDate(D))}</span></div>
       <div class="chips" role="group" aria-label="Meal">${MEALS.map(([k, l]) => `<button class="chip" data-act="meal" data-v="${k}" aria-pressed="${S.meal === k}">${l}</button>`).join("")}</div>
       ${canEst ? `<textarea class="field" id="f-desc" data-draft rows="3" aria-label="What are you eating?" placeholder="e.g. 1 cup rice, chicken adobo, fried egg. Or ask: Chickenjoy with rice and a Coke?">${esc(dv("f-desc"))}</textarea>
-        ${S.photoUrl ? `<div class="photo"><img src="${S.photoUrl}" alt="Your meal photo"><button class="btn danger sm" data-act="photo-clear">Remove photo</button></div>` : ""}
+        ${sampleImages ? `<div class="row">${S.photoUrl
+            ? `<div class="photo"><img src="${S.photoUrl}" alt="Your meal photo"><button class="btn danger sm" data-act="photo-clear">Remove photo</button></div>`
+            : `<label class="btn ghost sm" for="f-photo-cam">Take photo</label><label class="btn ghost sm" for="f-photo">Upload photo</label>`}
+          <input type="file" id="f-photo-cam" accept="image/*" capture="environment" hidden><input type="file" id="f-photo" accept="image/*" hidden></div>` : ""}
         <div class="row"><button class="btn" data-act="estimate" ${S.estBusy ? "disabled" : ""}>${S.estBusy === "log" ? "Estimating…" : "Log it"}</button>
-          <button class="btn ghost" data-act="ask" ${S.estBusy ? "disabled" : ""}>${S.estBusy === "ask" ? "Checking…" : "Can I eat this?"}</button>
-          ${sampleImages ? `<label class="btn ghost" for="f-photo">${S.photoUrl ? "Change photo" : "Add photo"}</label><input type="file" id="f-photo" accept="image/*" capture="environment" hidden>` : ""}</div>
+          <button class="btn ghost" data-act="ask" ${S.estBusy ? "disabled" : ""}>${S.estBusy === "ask" ? "Checking…" : "Can I eat this?"}</button></div>
         <p class="small muted"><b>Log it</b> when you've eaten. <b>Can I eat this?</b> shows where your day would end up first.</p>`
       : `<p class="small muted">${sampleState === "pending" ? "Connecting to Claude for calorie estimates…" : "Calorie estimates work when this page is open in Claude. You can still enter calories yourself below."}</p>`}
       ${S.est ? (S.est.mode === "ask" ? askHTML() : estHTML()) : ""}
@@ -1845,7 +1847,7 @@ $("#sheet").addEventListener("click", e => { if (e.target.id === "sheet") closeS
 
 document.addEventListener("change", e => {
   const t = e.target, act = t.dataset && t.dataset.act;
-  if (t.id === "f-photo" && t.files && t.files[0]) { clearPhoto(); S.foodPhoto = t.files[0]; try { S.photoUrl = URL.createObjectURL(t.files[0]); } catch {} render(); return; }
+  if ((t.id === "f-photo" || t.id === "f-photo-cam") && t.files && t.files[0]) { clearPhoto(); S.foodPhoto = t.files[0]; try { S.photoUrl = URL.createObjectURL(t.files[0]); } catch {} render(); return; }
   if (act === "habit") {
     const D = today(); put("habits", D, { ...clone(S.habits[D] || { date: D }), date: D, [t.dataset.k]: t.checked });
   } else if (act === "cardio") {
