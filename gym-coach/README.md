@@ -6,8 +6,9 @@ Live app (private to the owner): https://claude.ai/artifact/U5dH3q4vRHjL5zwKszrT
 
 `index.html` is the whole app. It is published as a Claude artifact, which gives it:
 
-- **db**: stores the log (profile, weigh-ins, waist, workouts, daily habits, check-ins). Access rules make it readable and writable by the owner only.
+- **db**: stores the log (profile, weigh-ins, waist, workouts, daily habits, check-ins, food log and saved foods). Access rules make it readable and writable by the owner only.
 - **sample**: the in-app coach chat and weekly reviews, which can swap exercises, change targets or start an easy week.
+  It also estimates calories and protein from a typed description or a meal photo on the Food tab.
 
 Opened outside Claude, it falls back to saving in the browser's local storage.
 
